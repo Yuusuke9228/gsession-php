@@ -1,679 +1,1212 @@
 <?php
-// controllers/ScheduleController.php
+// Controllers/ScheduleController.php
 namespace Controllers;
 
+use Core\Controller;
+use Core\Database;
 use Core\Auth;
 use Models\Schedule;
 use Models\User;
 use Models\Organization;
 
-class ScheduleController {
+class ScheduleController extends Controller
+{
+    private $db;
     private $auth;
-    private $model;
-    
-    public function __construct() {
+    private $schedule;
+    private $user;
+    private $organization;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->db = Database::getInstance();
         $this->auth = Auth::getInstance();
-        $this->model = new Schedule();
-    }
-    
-    // カレンダーページを表示（日表示）
-    public function day() {
-        // 認証チェック
+        $this->schedule = new Schedule();
+        $this->user = new User();
+        $this->organization = new Organization();
+
+        // ユーザーがログインしていない場合はログインページにリダイレクト
         if (!$this->auth->check()) {
-            header('Location:' . BASE_PATH . '/login');
-            exit;
+            $this->redirect('/login');
         }
-        
-        // 日付パラメータ（未指定時は今日）
+    }
+
+    // 日単位表示
+    public function day()
+    {
+        // 日付パラメータの取得（指定がなければ今日）
         $date = $_GET['date'] ?? date('Y-m-d');
-        
-        // 表示ユーザーID（未指定時は自分）
+
+        // ユーザーIDパラメータの取得（指定がなければ現在のユーザー）
         $userId = $_GET['user_id'] ?? $this->auth->id();
-        
-        // 日付の妥当性チェック
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+
+        // 日付の妥当性をチェック
+        if (!$this->isValidDate($date)) {
             $date = date('Y-m-d');
         }
-        
-        // スケジュールデータ取得
-        $schedules = $this->model->getUserDaySchedules($userId, $date);
-        
-        // ユーザー情報取得
-        $userModel = new User();
-        $user = $userModel->getById($userId);
-        
-        // ビューを読み込む
-        require_once __DIR__ . '/../views/layouts/header.php';
-        require_once __DIR__ . '/../views/schedule/day.php';
-        require_once __DIR__ . '/../views/layouts/footer.php';
-    }
-    
-    // カレンダーページを表示（週表示）
-    public function week() {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            header('Location:' . BASE_PATH . '/login');
-            exit;
+
+        // 前日、翌日の日付を計算
+        $prevDay = date('Y-m-d', strtotime($date . ' -1 day'));
+        $nextDay = date('Y-m-d', strtotime($date . ' +1 day'));
+
+        // ユーザー情報を取得
+        $user = $this->user->getById($userId);
+        if (!$user) {
+            $userId = $this->auth->id();
+            $user = $this->user->getById($userId);
         }
-        
-        // 日付パラメータ（未指定時は今日）
+
+        // ユーザー一覧を取得（ユーザー切替用）
+        $users = $this->user->getActiveUsers();
+
+        $viewData = [
+            'title' => date('Y年m月d日', strtotime($date)) . 'のスケジュール',
+            'date' => $date,
+            'prevDay' => $prevDay,
+            'nextDay' => $nextDay,
+            'userId' => $userId,
+            'user' => $user,
+            'users' => $users,
+            'jsFiles' => ['schedule.js']
+        ];
+
+        $this->view('schedule/day', $viewData);
+    }
+
+    // 週単位表示
+    public function week()
+    {
+        // 日付パラメータの取得（指定がなければ今日）
         $date = $_GET['date'] ?? date('Y-m-d');
-        
-        // 表示ユーザーID（未指定時は自分）
+
+        // ユーザーIDパラメータの取得（指定がなければ現在のユーザー）
         $userId = $_GET['user_id'] ?? $this->auth->id();
-        
-        // 日付の妥当性チェック
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+
+        // 日付の妥当性をチェック
+        if (!$this->isValidDate($date)) {
             $date = date('Y-m-d');
         }
-        
-        // スケジュールデータ取得
-        $schedules = $this->model->getUserWeekSchedules($userId, $date);
-        
-        // 週の日付範囲を計算
-        $dateObj = new \DateTime($date);
-        $weekday = $dateObj->format('w'); // 0（日曜）から6（土曜）
-        $dateObj->modify('-' . $weekday . ' days'); // 週の開始日（日曜）
+
+        // 週の開始日と終了日を取得（月曜日から日曜日）
+        $dayOfWeek = date('N', strtotime($date));
+        $weekStart = date('Y-m-d', strtotime($date . ' -' . ($dayOfWeek - 1) . ' days'));
+        $weekEnd = date('Y-m-d', strtotime($weekStart . ' +6 days'));
+
+        // 週の日付配列を生成
         $weekDates = [];
-        
         for ($i = 0; $i < 7; $i++) {
-            $currentDate = clone $dateObj;
-            $currentDate->modify('+' . $i . ' days');
-            $weekDates[] = $currentDate->format('Y-m-d');
+            $weekDates[] = date('Y-m-d', strtotime($weekStart . ' +' . $i . ' days'));
         }
-        
-        // ユーザー情報取得
-        $userModel = new User();
-        $user = $userModel->getById($userId);
-        
-        // ビューを読み込む
-        require_once __DIR__ . '/../views/layouts/header.php';
-        require_once __DIR__ . '/../views/schedule/week.php';
-        require_once __DIR__ . '/../views/layouts/footer.php';
+
+        // 前週、翌週の日付を計算
+        $prevWeek = date('Y-m-d', strtotime($weekStart . ' -7 days'));
+        $nextWeek = date('Y-m-d', strtotime($weekStart . ' +7 days'));
+
+        // ユーザー情報を取得
+        $user = $this->user->getById($userId);
+        if (!$user) {
+            $userId = $this->auth->id();
+            $user = $this->user->getById($userId);
+        }
+
+        // ユーザー一覧を取得（ユーザー切替用）
+        $users = $this->user->getActiveUsers();
+
+        $viewData = [
+            'title' => date('Y年m月d日', strtotime($weekStart)) . '～' . date('Y年m月d日', strtotime($weekEnd)) . 'のスケジュール',
+            'date' => $date,
+            'weekStart' => $weekStart,
+            'weekEnd' => $weekEnd,
+            'weekDates' => $weekDates,
+            'prevWeek' => $prevWeek,
+            'nextWeek' => $nextWeek,
+            'userId' => $userId,
+            'user' => $user,
+            'users' => $users,
+            'jsFiles' => ['schedule.js']
+        ];
+
+        $this->view('schedule/week', $viewData);
     }
-    
-    // カレンダーページを表示（月表示）
-    public function month() {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            header('Location:' . BASE_PATH . '/login');
-            exit;
-        }
-        
-        // 年月パラメータ（未指定時は今月）
-        $year = $_GET['year'] ?? date('Y');
-        $month = $_GET['month'] ?? date('m');
-        
-        // 表示ユーザーID（未指定時は自分）
+
+    // 月単位表示
+    public function month()
+    {
+        // 年月パラメータの取得（指定がなければ今月）
+        $year = isset($_GET['year']) ? (int) $_GET['year'] : (int) date('Y');
+        $month = isset($_GET['month']) ? (int) $_GET['month'] : (int) date('m');
+
+        // ユーザーIDパラメータの取得（指定がなければ現在のユーザー）
         $userId = $_GET['user_id'] ?? $this->auth->id();
-        
-        // 年月の妥当性チェック
-        if (!is_numeric($year) || !is_numeric($month) || $month < 1 || $month > 12) {
+
+        // 年月の妥当性をチェック
+        if ($year < 1970 || $year > 2099 || $month < 1 || $month > 12) {
+            $year = (int) date('Y');
+            $month = (int) date('m');
+        }
+
+        // 月の日数
+        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+
+        // 月の最初の日の曜日（0:日曜日、1:月曜日、...）
+        $firstDayOfWeek = date('w', strtotime("$year-$month-01"));
+
+        // 前月、翌月の年月を計算
+        $prevMonth = $month - 1;
+        $prevYear = $year;
+        if ($prevMonth < 1) {
+            $prevMonth = 12;
+            $prevYear--;
+        }
+
+        $nextMonth = $month + 1;
+        $nextYear = $year;
+        if ($nextMonth > 12) {
+            $nextMonth = 1;
+            $nextYear++;
+        }
+
+        // ユーザー情報を取得
+        $user = $this->user->getById($userId);
+        if (!$user) {
+            $userId = $this->auth->id();
+            $user = $this->user->getById($userId);
+        }
+
+        // ユーザー一覧を取得（ユーザー切替用）
+        $users = $this->user->getActiveUsers();
+
+        $viewData = [
+            'title' => $year . '年' . $month . '月のスケジュール',
+            'year' => $year,
+            'month' => $month,
+            'daysInMonth' => $daysInMonth,
+            'firstDayOfWeek' => $firstDayOfWeek,
+            'prevYear' => $prevYear,
+            'prevMonth' => $prevMonth,
+            'nextYear' => $nextYear,
+            'nextMonth' => $nextMonth,
+            'userId' => $userId,
+            'user' => $user,
+            'users' => $users,
+            'jsFiles' => ['schedule.js']
+        ];
+
+        $this->view('schedule/month', $viewData);
+    }
+
+    // スケジュール新規作成フォーム
+    public function create()
+    {
+        // 日付パラメータの取得（指定がなければ今日）
+        $date = $_GET['date'] ?? date('Y-m-d');
+        $time = $_GET['time'] ?? '09:00';
+        $allDay = isset($_GET['all_day']) ? (bool) $_GET['all_day'] : false;
+
+        // 日付の妥当性をチェック
+        if (!$this->isValidDate($date)) {
+            $date = date('Y-m-d');
+        }
+
+        // 時間の妥当性をチェック
+        if (!preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', $time)) {
+            $time = '09:00';
+        }
+
+        // 開始時間と終了時間
+        $startTime = $date . ' ' . $time;
+        $endTime = date('Y-m-d H:i', strtotime($startTime . ' +1 hour'));
+
+        // 組織一覧を取得
+        $organizations = $this->organization->getAll();
+
+        // 繰り返しタイプ一覧
+        $repeatTypes = [
+            'none' => '繰り返しなし',
+            'daily' => '毎日',
+            'weekly' => '毎週',
+            'monthly' => '毎月',
+            'yearly' => '毎年'
+        ];
+
+        // 優先度一覧
+        $priorities = [
+            'normal' => '通常',
+            'high' => '高',
+            'low' => '低'
+        ];
+
+        // 公開範囲一覧
+        $visibilities = [
+            'public' => '全体公開',
+            'private' => '非公開',
+            'specific' => '特定ユーザーのみ'
+        ];
+
+        $viewData = [
+            'title' => 'スケジュール新規作成',
+            'formTitle' => 'スケジュール新規作成',
+            'formAction' => BASE_PATH . '/api/schedule',
+            'formMethod' => 'POST',
+            'schedule' => [
+                'id' => null,
+                'title' => '',
+                'description' => '',
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'all_day' => $allDay,
+                'repeat_type' => 'none',
+                'repeat_end_date' => '',
+                'location' => '',
+                'priority' => 'normal',
+                'visibility' => 'public',
+                'participants' => [],
+                'organizations' => []
+            ],
+            'repeatTypes' => $repeatTypes,
+            'priorities' => $priorities,
+            'visibilities' => $visibilities,
+            'organizations' => $organizations,
+            'jsFiles' => ['schedule.js']
+        ];
+
+        $this->view('schedule/form', $viewData);
+    }
+
+    // スケジュール編集フォーム
+    public function edit($params)
+    {
+        $id = $params['id'] ?? 0;
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
+        if (!$schedule) {
+            $this->redirect('/schedule');
+        }
+
+        // 編集権限チェック
+        $canEdit = $this->canEditSchedule($schedule);
+        if (!$canEdit) {
+            $this->redirect('/schedule/view/' . $id);
+        }
+
+        // 参加者一覧を取得
+        $participants = $this->schedule->getParticipants($id);
+
+        // 共有組織一覧を取得
+        $sharedOrganizations = $this->schedule->getSharedOrganizations($id);
+
+        // 組織一覧を取得
+        $organizations = $this->organization->getAll();
+
+        // 繰り返しタイプ一覧
+        $repeatTypes = [
+            'none' => '繰り返しなし',
+            'daily' => '毎日',
+            'weekly' => '毎週',
+            'monthly' => '毎月',
+            'yearly' => '毎年'
+        ];
+
+        // 優先度一覧
+        $priorities = [
+            'normal' => '通常',
+            'high' => '高',
+            'low' => '低'
+        ];
+
+        // 公開範囲一覧
+        $visibilities = [
+            'public' => '全体公開',
+            'private' => '非公開',
+            'specific' => '特定ユーザーのみ'
+        ];
+
+        $schedule['participants'] = $participants;
+        $schedule['organizations'] = $sharedOrganizations;
+
+        $viewData = [
+            'title' => 'スケジュール編集',
+            'formTitle' => 'スケジュール編集',
+            'formAction' => BASE_PATH . '/api/schedule/' . $id,
+            'formMethod' => 'POST',
+            'schedule' => $schedule,
+            'repeatTypes' => $repeatTypes,
+            'priorities' => $priorities,
+            'visibilities' => $visibilities,
+            'organizations' => $organizations,
+            'jsFiles' => ['schedule.js']
+        ];
+
+        $this->view('schedule/form', $viewData);
+    }
+
+    // スケジュール詳細表示
+    public function view($params)
+    {
+        $id = $params['id'] ?? 0;
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
+        if (!$schedule) {
+            $this->redirect('/schedule');
+        }
+
+        // 閲覧権限チェック
+        $canView = $this->canViewSchedule($schedule);
+        if (!$canView) {
+            $this->redirect('/schedule');
+        }
+
+        // 編集権限チェック
+        $canEdit = $this->canEditSchedule($schedule);
+
+        // 削除権限チェック
+        $canDelete = $this->canDeleteSchedule($schedule);
+
+        // 参加者一覧を取得
+        $participants = $this->schedule->getParticipants($id);
+
+        // 共有組織一覧を取得
+        $sharedOrganizations = $this->schedule->getSharedOrganizations($id);
+
+        // 現在のユーザーの参加ステータス
+        $participationStatus = $this->schedule->getUserParticipationStatus($id, $this->auth->id());
+
+        $viewData = [
+            'title' => $schedule['title'],
+            'schedule' => $schedule,
+            'participants' => $participants,
+            'sharedOrganizations' => $sharedOrganizations,
+            'participationStatus' => $participationStatus,
+            'canEdit' => $canEdit,
+            'canDelete' => $canDelete,
+            'jsFiles' => ['schedule.js']
+        ];
+
+        $this->view('schedule/view', $viewData);
+    }
+
+    // 日単位スケジュールAPI
+    public function apiGetDay($params)
+    {
+        $date = $params['date'] ?? date('Y-m-d');
+        $userId = $params['user_id'] ?? $this->auth->id();
+
+        // 日付の妥当性をチェック
+        if (!$this->isValidDate($date)) {
+            $date = date('Y-m-d');
+        }
+
+        // ユーザーの妥当性をチェック
+        $user = $this->user->getById($userId);
+        if (!$user) {
+            $userId = $this->auth->id();
+        }
+
+        // スケジュールデータを取得
+        $schedules = $this->schedule->getByDay($date, $userId);
+
+        // 閲覧権限でフィルタリング
+        $filteredSchedules = array_filter($schedules, [$this, 'canViewSchedule']);
+
+        return [
+            'success' => true,
+            'data' => array_values($filteredSchedules)
+        ];
+    }
+
+    // 週単位スケジュールAPI
+    public function apiGetWeek($params)
+    {
+        $date = $params['date'] ?? date('Y-m-d');
+        $userId = $params['user_id'] ?? $this->auth->id();
+
+        // 日付の妥当性をチェック
+        if (!$this->isValidDate($date)) {
+            $date = date('Y-m-d');
+        }
+
+        // ユーザーの妥当性をチェック
+        $user = $this->user->getById($userId);
+        if (!$user) {
+            $userId = $this->auth->id();
+        }
+
+        // 週の開始日と終了日を取得（月曜日から日曜日）
+        $dayOfWeek = date('N', strtotime($date));
+        $weekStart = date('Y-m-d', strtotime($date . ' -' . ($dayOfWeek - 1) . ' days'));
+        $weekEnd = date('Y-m-d', strtotime($weekStart . ' +6 days'));
+
+        // 週の日付配列を生成
+        $weekDates = [];
+        for ($i = 0; $i < 7; $i++) {
+            $weekDates[] = date('Y-m-d', strtotime($weekStart . ' +' . $i . ' days'));
+        }
+
+        // スケジュールデータを取得
+        $schedules = $this->schedule->getByDateRange($weekStart, $weekEnd, $userId);
+
+        // 閲覧権限でフィルタリング
+        $filteredSchedules = array_filter($schedules, [$this, 'canViewSchedule']);
+
+        return [
+            'success' => true,
+            'data' => [
+                'week_dates' => $weekDates,
+                'schedules' => array_values($filteredSchedules)
+            ]
+        ];
+    }
+
+    // 月単位スケジュールAPI
+    public function apiGetMonth($params)
+    {
+        $year = $params['year'] ?? date('Y');
+        $month = $params['month'] ?? date('m');
+        $userId = $params['user_id'] ?? $this->auth->id();
+
+        // 年月の妥当性をチェック
+        if ($year < 1970 || $year > 2099 || $month < 1 || $month > 12) {
             $year = date('Y');
             $month = date('m');
         }
-        
-        // スケジュールデータ取得
-        $schedules = $this->model->getUserMonthSchedules($userId, $year, $month);
-        
-        // 月の日数
-        $daysInMonth = date('t', strtotime("$year-$month-01"));
-        
-        // 月の初日の曜日（0:日曜, 1:月曜, ..., 6:土曜）
-        $firstDayOfWeek = date('w', strtotime("$year-$month-01"));
-        
-        // ユーザー情報取得
-        $userModel = new User();
-        $user = $userModel->getById($userId);
-        
-        // ビューを読み込む
-        require_once __DIR__ . '/../views/layouts/header.php';
-        require_once __DIR__ . '/../views/schedule/month.php';
-        require_once __DIR__ . '/../views/layouts/footer.php';
-    }
-    
-    // スケジュール作成ページを表示
-    public function create() {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            header('Location:' . BASE_PATH . '/login');
-            exit;
-        }
-        
-        // 初期日時（パラメータから取得、未指定時は現在）
-        $date = $_GET['date'] ?? date('Y-m-d');
-        $time = $_GET['time'] ?? date('H:00');
-        
-        // ユーザーリスト取得（参加者選択用）
-        $userModel = new User();
-        $users = $userModel->getAll(1, 1000); // 最大1000人
-        
-        // 組織リスト取得（共有用）
-        $orgModel = new Organization();
-        $organizations = $orgModel->getAll();
-        
-        // ビューを読み込む
-        require_once __DIR__ . '/../views/layouts/header.php';
-        require_once __DIR__ . '/../views/schedule/create.php';
-        require_once __DIR__ . '/../views/layouts/footer.php';
-    }
-    
-    // スケジュール編集ページを表示
-    public function edit($params) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            header('Location:' . BASE_PATH . '/login');
-            exit;
-        }
-        
-        $id = $params['id'] ?? null;
-        if (!$id) {
-            header('Location:' . BASE_PATH . '/schedule');
-            exit;
-        }
-        
-        // スケジュール情報を取得
-        $schedule = $this->model->getById($id, $this->auth->id());
-        if (!$schedule) {
-            header('Location:' . BASE_PATH . '/schedule');
-            exit;
-        }
-        
-        // 作成者かどうかチェック
-        if ($schedule['creator_id'] != $this->auth->id() && !$this->auth->isAdmin()) {
-            header('Location:' . BASE_PATH . '/schedule/view/' . $id);
-            exit;
-        }
-        
-        // 参加者リスト取得
-        $participants = $this->model->getParticipants($id);
-        $participantIds = array_column($participants, 'id');
-        
-        // 共有組織リスト取得
-        $sharedOrganizations = $this->model->getOrganizations($id);
-        $sharedOrgIds = array_column($sharedOrganizations, 'id');
-        
-        // ユーザーリスト取得（参加者選択用）
-        $userModel = new User();
-        $users = $userModel->getAll(1, 1000); // 最大1000人
-        
-        // 組織リスト取得（共有用）
-        $orgModel = new Organization();
-        $organizations = $orgModel->getAll();
-        
-        // ビューを読み込む
-        require_once __DIR__ . '/../views/layouts/header.php';
-        require_once __DIR__ . '/../views/schedule/edit.php';
-        require_once __DIR__ . '/../views/layouts/footer.php';
-    }
-    
-    // スケジュール詳細ページを表示
-    public function view($params) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            header('Location:' . BASE_PATH . '/login');
-            exit;
-        }
-        
-        $id = $params['id'] ?? null;
-        if (!$id) {
-            header('Location:' . BASE_PATH . '/schedule');
-            exit;
-        }
-        
-        // スケジュール情報を取得
-        $schedule = $this->model->getById($id, $this->auth->id());
-        if (!$schedule) {
-            header('Location:' . BASE_PATH . '/schedule');
-            exit;
-        }
-        
-        // 参加者リスト取得
-        $participants = $this->model->getParticipants($id);
-        
-        // 共有組織リスト取得
-        $sharedOrganizations = $this->model->getOrganizations($id);
-        
-        // 自分が参加者かどうか
-        $isParticipant = false;
-        $participationStatus = null;
-        foreach ($participants as $participant) {
-            if ($participant['id'] == $this->auth->id()) {
-                $isParticipant = true;
-                $participationStatus = $participant['participation_status'];
-                break;
-            }
-        }
-        
-        // ビューを読み込む
-        require_once __DIR__ . '/../views/layouts/header.php';
-        require_once __DIR__ . '/../views/schedule/view.php';
-        require_once __DIR__ . '/../views/layouts/footer.php';
-    }
-    
-    // API: 日単位スケジュールを取得
-    public function apiGetDay($params) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        // 日付
-        $date = $params['date'] ?? date('Y-m-d');
-        
-        // ユーザーID
-        $userId = $params['user_id'] ?? $this->auth->id();
-        
-        $schedules = $this->model->getUserDaySchedules($userId, $date);
-        
-        return ['success' => true, 'data' => $schedules];
-    }
-    
-    // API: 週単位スケジュールを取得
-    public function apiGetWeek($params) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        // 日付
-        $date = $params['date'] ?? date('Y-m-d');
-        
-        // ユーザーID
-        $userId = $params['user_id'] ?? $this->auth->id();
-        
-        $schedules = $this->model->getUserWeekSchedules($userId, $date);
-        
-        // 週の日付範囲を計算
-        $dateObj = new \DateTime($date);
-        $weekday = $dateObj->format('w'); // 0（日曜）から6（土曜）
-        $dateObj->modify('-' . $weekday . ' days'); // 週の開始日（日曜）
-        $weekDates = [];
-        
-        for ($i = 0; $i < 7; $i++) {
-            $currentDate = clone $dateObj;
-            $currentDate->modify('+' . $i . ' days');
-            $weekDates[] = $currentDate->format('Y-m-d');
-        }
-        
-        return [
-            'success' => true,
-            'data' => [
-                'schedules' => $schedules,
-                'week_dates' => $weekDates
-            ]
-        ];
-    }
-    
-    // API: 月単位スケジュールを取得
-    public function apiGetMonth($params) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        // 年月
-        $year = $params['year'] ?? date('Y');
-        $month = $params['month'] ?? date('m');
-        
-        // ユーザーID
-        $userId = $params['user_id'] ?? $this->auth->id();
-        
-        $schedules = $this->model->getUserMonthSchedules($userId, $year, $month);
-        
-        // 月の日数と初日の曜日
-        $daysInMonth = date('t', strtotime("$year-$month-01"));
-        $firstDayOfWeek = date('w', strtotime("$year-$month-01"));
-        
-        return [
-            'success' => true,
-            'data' => [
-                'schedules' => $schedules,
-                'days_in_month' => $daysInMonth,
-                'first_day_of_week' => $firstDayOfWeek
-            ]
-        ];
-    }
-    
-    // API: 特定の期間のスケジュールを取得
-    public function apiGetByDateRange($params) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        // 開始日時と終了日時
-        $startDate = $params['start_date'] ?? date('Y-m-d');
-        $endDate = $params['end_date'] ?? date('Y-m-d', strtotime('+7 days'));
-        
-        // ユーザーID
-        $userId = $params['user_id'] ?? $this->auth->id();
-        
-        // 組織ID
-        $organizationId = $params['organization_id'] ?? null;
-        
-        $schedules = $this->model->getByDateRange($startDate, $endDate, $userId, $organizationId);
-        
-        return ['success' => true, 'data' => $schedules];
-    }
-    
-    // API: 特定のスケジュールを取得
-    public function apiGetOne($params) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        $id = $params['id'] ?? null;
-        if (!$id) {
-            return ['error' => 'Invalid ID', 'code' => 400];
-        }
-        
-        $schedule = $this->model->getById($id, $this->auth->id());
-        if (!$schedule) {
-            return ['error' => 'Schedule not found or access denied', 'code' => 404];
-        }
-        
-        // 参加者リスト取得
-        $participants = $this->model->getParticipants($id);
-        
-        // 共有組織リスト取得
-        $sharedOrganizations = $this->model->getOrganizations($id);
-        
-        return [
-            'success' => true,
-            'data' => [
-                'schedule' => $schedule,
-                'participants' => $participants,
-                'organizations' => $sharedOrganizations
-            ]
-        ];
-    }
-    
-    // API: スケジュールを作成
-    public function apiCreate($params, $data) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        // 作成者IDを設定
-        $data['creator_id'] = $this->auth->id();
-        
-        // バリデーション
-        if (empty($data['title']) || empty($data['start_time']) || empty($data['end_time'])) {
-            return ['error' => 'Title, start time and end time are required', 'code' => 400];
-        }
-        
-        // 開始時間と終了時間の整合性チェック
-        if (strtotime($data['start_time']) > strtotime($data['end_time'])) {
-            return ['error' => 'Start time must be before end time', 'code' => 400];
-        }
-        
-        $id = $this->model->create($data);
-        if (!$id) {
-            return ['error' => 'Failed to create schedule', 'code' => 500];
-        }
-        
-        $schedule = $this->model->getById($id);
-        
-        return ['success' => true, 'data' => $schedule, 'message' => 'スケジュールを作成しました'];
-    }
-    
-    // API: スケジュールを更新
-    public function apiUpdate($params, $data) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        $id = $params['id'] ?? null;
-        if (!$id) {
-            return ['error' => 'Invalid ID', 'code' => 400];
-        }
-        
-        // スケジュールの存在チェック
-        $schedule = $this->model->getById($id, $this->auth->id());
-        if (!$schedule) {
-            return ['error' => 'Schedule not found or access denied', 'code' => 404];
-        }
-        
-        // 作成者または管理者のみ更新可能
-        if ($schedule['creator_id'] != $this->auth->id() && !$this->auth->isAdmin()) {
-            return ['error' => 'Permission denied', 'code' => 403];
-        }
-        
-        // バリデーション
-        if (isset($data['start_time']) && isset($data['end_time']) && 
-            strtotime($data['start_time']) > strtotime($data['end_time'])) {
-            return ['error' => 'Start time must be before end time', 'code' => 400];
-        }
-        
-        $success = $this->model->update($id, $data, $this->auth->id());
-        if (!$success) {
-            return ['error' => 'Failed to update schedule', 'code' => 500];
-        }
-        
-        $schedule = $this->model->getById($id);
-        
-        return ['success' => true, 'data' => $schedule, 'message' => 'スケジュールを更新しました'];
-    }
-    
-    // API: スケジュールを削除
-    public function apiDelete($params) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        $id = $params['id'] ?? null;
-        if (!$id) {
-            return ['error' => 'Invalid ID', 'code' => 400];
-        }
-        
-        // スケジュールの存在チェック
-        $schedule = $this->model->getById($id, $this->auth->id());
-        if (!$schedule) {
-            return ['error' => 'Schedule not found or access denied', 'code' => 404];
-        }
-        
-        // 作成者または管理者のみ削除可能
-        if ($schedule['creator_id'] != $this->auth->id() && !$this->auth->isAdmin()) {
-            return ['error' => 'Permission denied', 'code' => 403];
-        }
-        
-        $success = $this->model->delete($id, $this->auth->id());
-        if (!$success) {
-            return ['error' => 'Failed to delete schedule', 'code' => 500];
-        }
-        
-        return ['success' => true, 'message' => 'スケジュールを削除しました'];
-    }
-    
-    // API: 参加ステータスを更新
-    public function apiUpdateParticipantStatus($params, $data) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        $id = $params['id'] ?? null;
-        if (!$id || empty($data['status'])) {
-            return ['error' => 'Invalid parameters', 'code' => 400];
-        }
-        
-        // スケジュールの存在チェック
-        $schedule = $this->model->getById($id, $this->auth->id());
-        if (!$schedule) {
-            return ['error' => 'Schedule not found or access denied', 'code' => 404];
-        }
-        
-        // 参加者リスト確認
-        $participants = $this->model->getParticipants($id);
-        $isParticipant = false;
-        
-        foreach ($participants as $participant) {
-            if ($participant['id'] == $this->auth->id()) {
-                $isParticipant = true;
-                break;
-            }
-        }
-        
-        if (!$isParticipant) {
-            return ['error' => 'You are not a participant of this schedule', 'code' => 403];
-        }
-        
-        // ステータス値のバリデーション
-        $allowedStatuses = ['pending', 'accepted', 'declined', 'tentative'];
-        if (!in_array($data['status'], $allowedStatuses)) {
-            return ['error' => 'Invalid status value', 'code' => 400];
-        }
-        
-        $success = $this->model->updateParticipantStatus($id, $this->auth->id(), $data['status']);
-        if (!$success) {
-            return ['error' => 'Failed to update status', 'code' => 500];
-        }
-        
-        return ['success' => true, 'message' => '参加ステータスを更新しました'];
-    }
-    
-    // API: 参加者を追加
-    public function apiAddParticipant($params, $data) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        $id = $params['id'] ?? null;
-        if (!$id || empty($data['user_id'])) {
-            return ['error' => 'Invalid parameters', 'code' => 400];
-        }
-        
-        // スケジュールの存在チェック
-        $schedule = $this->model->getById($id, $this->auth->id());
-        if (!$schedule) {
-            return ['error' => 'Schedule not found or access denied', 'code' => 404];
-        }
-        
-        // 作成者または管理者のみ参加者追加可能
-        if ($schedule['creator_id'] != $this->auth->id() && !$this->auth->isAdmin()) {
-            return ['error' => 'Permission denied', 'code' => 403];
-        }
-        
-        // ユーザーの存在チェック
-        $userModel = new User();
-        $user = $userModel->getById($data['user_id']);
+
+        // ユーザーの妥当性をチェック
+        $user = $this->user->getById($userId);
         if (!$user) {
-            return ['error' => 'User not found', 'code' => 404];
+            $userId = $this->auth->id();
         }
-        
-        $success = $this->model->addParticipant($id, $data['user_id'], $data['status'] ?? 'pending');
-        if (!$success) {
-            return ['error' => 'Failed to add participant', 'code' => 500];
-        }
-        
-        return ['success' => true, 'message' => '参加者を追加しました'];
+
+        // 月の開始日と終了日
+        $startDate = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-01';
+        $endDate = date('Y-m-t', strtotime($startDate));
+
+        // 月の日数
+        $daysInMonth = date('t', strtotime($startDate));
+
+        // 月の最初の日の曜日（0:日曜日、1:月曜日、...）
+        $firstDayOfWeek = date('w', strtotime($startDate));
+
+        // スケジュールデータを取得
+        $schedules = $this->schedule->getByDateRange($startDate, $endDate, $userId);
+
+        // 閲覧権限でフィルタリング
+        $filteredSchedules = array_filter($schedules, [$this, 'canViewSchedule']);
+
+        return [
+            'success' => true,
+            'data' => [
+                'days_in_month' => $daysInMonth,
+                'first_day_of_week' => $firstDayOfWeek,
+                'schedules' => array_values($filteredSchedules)
+            ]
+        ];
     }
-    
-    // API: 参加者を削除
-    public function apiRemoveParticipant($params, $data) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
+
+    // 日付範囲でスケジュール取得API
+    public function apiGetByDateRange($params)
+    {
+        $startDate = $params['start_date'] ?? date('Y-m-d');
+        $endDate = $params['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
+        $userId = $params['user_id'] ?? $this->auth->id();
+
+        // 日付の妥当性をチェック
+        if (!$this->isValidDate($startDate)) {
+            $startDate = date('Y-m-d');
         }
-        
-        $id = $params['id'] ?? null;
-        if (!$id || empty($data['user_id'])) {
-            return ['error' => 'Invalid parameters', 'code' => 400];
+
+        if (!$this->isValidDate($endDate)) {
+            $endDate = date('Y-m-d', strtotime('+30 days'));
         }
-        
-        // スケジュールの存在チェック
-        $schedule = $this->model->getById($id, $this->auth->id());
-        if (!$schedule) {
-            return ['error' => 'Schedule not found or access denied', 'code' => 404];
+
+        // ユーザーの妥当性をチェック
+        $user = $this->user->getById($userId);
+        if (!$user) {
+            $userId = $this->auth->id();
         }
-        
-        // 作成者、管理者、または自分自身の参加を取り消す場合のみ許可
-        if ($schedule['creator_id'] != $this->auth->id() && 
-            !$this->auth->isAdmin() && 
-            $this->auth->id() != $data['user_id']) {
-            return ['error' => 'Permission denied', 'code' => 403];
-        }
-        
-        $success = $this->model->removeParticipant($id, $data['user_id']);
-        if (!$success) {
-            return ['error' => 'Failed to remove participant', 'code' => 500];
-        }
-        
-        return ['success' => true, 'message' => '参加者を削除しました'];
+
+        // スケジュールデータを取得
+        $schedules = $this->schedule->getByDateRange($startDate, $endDate, $userId);
+
+        // 閲覧権限でフィルタリング
+        $filteredSchedules = array_filter($schedules, [$this, 'canViewSchedule']);
+
+        return [
+            'success' => true,
+            'data' => array_values($filteredSchedules)
+        ];
     }
-    
-    // API: 組織を共有対象に追加
-    public function apiAddOrganization($params, $data) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        $id = $params['id'] ?? null;
-        if (!$id || empty($data['organization_id'])) {
-            return ['error' => 'Invalid parameters', 'code' => 400];
-        }
-        
-        // スケジュールの存在チェック
-        $schedule = $this->model->getById($id, $this->auth->id());
+
+    // スケジュール詳細取得API
+    public function apiGetOne($params)
+    {
+        $id = $params['id'] ?? 0;
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
         if (!$schedule) {
-            return ['error' => 'Schedule not found or access denied', 'code' => 404];
+            return [
+                'success' => false,
+                'error' => 'スケジュールが見つかりません'
+            ];
         }
-        
-        // 作成者または管理者のみ組織共有可能
-        if ($schedule['creator_id'] != $this->auth->id() && !$this->auth->isAdmin()) {
-            return ['error' => 'Permission denied', 'code' => 403];
+
+        // 閲覧権限チェック
+        $canView = $this->canViewSchedule($schedule);
+        if (!$canView) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの閲覧権限がありません'
+            ];
         }
-        
+
+        // 参加者一覧を取得
+        $participants = $this->schedule->getParticipants($id);
+
+        // 共有組織一覧を取得
+        $sharedOrganizations = $this->schedule->getSharedOrganizations($id);
+
+        $schedule['participants'] = $participants;
+        $schedule['organizations'] = $sharedOrganizations;
+
+        return [
+            'success' => true,
+            'data' => $schedule
+        ];
+    }
+
+    // スケジュール新規作成API
+    public function apiCreate($params, $data)
+    {
+        // バリデーション
+        $validation = $this->validateScheduleData($data);
+        if (!empty($validation)) {
+            return [
+                'success' => false,
+                'error' => '入力内容に誤りがあります',
+                'validation' => $validation
+            ];
+        }
+
+        // 現在のユーザーIDを取得
+        $userId = $this->auth->id();
+
+        // スケジュールデータを作成
+        $scheduleData = [
+            'title' => $data['title'],
+            'description' => $data['description'] ?? '',
+            'start_time' => $data['start_time'],
+            'end_time' => $data['end_time'],
+            'all_day' => isset($data['all_day']) ? 1 : 0,
+            'repeat_type' => $data['repeat_type'] ?? 'none',
+            'repeat_end_date' => $data['repeat_end_date'] ?? null,
+            'location' => $data['location'] ?? '',
+            'priority' => $data['priority'] ?? 'normal',
+            'visibility' => $data['visibility'] ?? 'public',
+            'creator_id' => $userId,
+            'created_at' => date('Y-m-d H:i:s')
+        ];
+
+        // スケジュールを作成
+        $scheduleId = $this->schedule->create($scheduleData);
+
+        if (!$scheduleId) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの作成に失敗しました'
+            ];
+        }
+
+        // 参加者を追加
+        $participants = isset($data['participants']) ? $data['participants'] : [];
+        if (!is_array($participants)) {
+            $participants = [];
+        }
+
+        // 作成者を参加者に追加
+        $participants[] = $userId;
+        $participants = array_unique($participants);
+
+        foreach ($participants as $participantId) {
+            // 参加者が自分自身の場合は「参加」、それ以外は「未回答」
+            $status = ($participantId == $userId) ? 'accepted' : 'pending';
+            $this->schedule->addParticipant($scheduleId, $participantId, $status);
+        }
+
+        // 共有組織を追加
+        $organizations = isset($data['organizations']) ? $data['organizations'] : [];
+        if (!is_array($organizations)) {
+            $organizations = [];
+        }
+
+        foreach ($organizations as $organizationId) {
+            $this->schedule->addSharedOrganization($scheduleId, $organizationId);
+        }
+
+        return [
+            'success' => true,
+            'message' => 'スケジュールが正常に作成されました',
+            'data' => [
+                'id' => $scheduleId,
+                'redirect' => BASE_PATH . '/schedule/view/' . $scheduleId
+            ]
+        ];
+    }
+
+    // スケジュール更新API
+    public function apiUpdate($params, $data)
+    {
+        $id = $params['id'] ?? 0;
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
+        if (!$schedule) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールが見つかりません'
+            ];
+        }
+
+        // 編集権限チェック
+        $canEdit = $this->canEditSchedule($schedule);
+        if (!$canEdit) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの編集権限がありません'
+            ];
+        }
+
+        // バリデーション
+        $validation = $this->validateScheduleData($data);
+        if (!empty($validation)) {
+            return [
+                'success' => false,
+                'error' => '入力内容に誤りがあります',
+                'validation' => $validation
+            ];
+        }
+
+        // スケジュールデータを更新
+        $scheduleData = [
+            'title' => $data['title'],
+            'description' => $data['description'] ?? '',
+            'start_time' => $data['start_time'],
+            'end_time' => $data['end_time'],
+            'all_day' => isset($data['all_day']) ? 1 : 0,
+            'repeat_type' => $data['repeat_type'] ?? 'none',
+            'repeat_end_date' => $data['repeat_end_date'] ?? null,
+            'location' => $data['location'] ?? '',
+            'priority' => $data['priority'] ?? 'normal',
+            'visibility' => $data['visibility'] ?? 'public',
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        // スケジュールを更新
+        $result = $this->schedule->update($id, $scheduleData);
+
+        if (!$result) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの更新に失敗しました'
+            ];
+        }
+
+        // 参加者を更新
+        $participants = isset($data['participants']) ? $data['participants'] : [];
+        if (!is_array($participants)) {
+            $participants = [];
+        }
+
+        // 作成者を参加者に追加
+        $participants[] = $schedule['creator_id'];
+        $participants = array_unique($participants);
+
+        // 現在の参加者を削除
+        $this->schedule->removeAllParticipants($id);
+
+        // 参加者を追加
+        foreach ($participants as $participantId) {
+            // 既存の参加者のステータスを取得
+            $status = $this->schedule->getUserParticipationStatus($id, $participantId);
+
+            // ステータスがない場合は、作成者なら「参加」、それ以外は「未回答」
+            if (!$status) {
+                $status = ($participantId == $schedule['creator_id']) ? 'accepted' : 'pending';
+            }
+
+            $this->schedule->addParticipant($id, $participantId, $status);
+        }
+
+        // 共有組織を更新
+        $organizations = isset($data['organizations']) ? $data['organizations'] : [];
+        if (!is_array($organizations)) {
+            $organizations = [];
+        }
+
+        // 現在の共有組織を削除
+        $this->schedule->removeAllSharedOrganizations($id);
+
+        // 共有組織を追加
+        foreach ($organizations as $organizationId) {
+            $this->schedule->addSharedOrganization($id, $organizationId);
+        }
+
+        return [
+            'success' => true,
+            'message' => 'スケジュールが正常に更新されました',
+            'data' => [
+                'id' => $id,
+                'redirect' => BASE_PATH . '/schedule/view/' . $id
+            ]
+        ];
+    }
+
+    // スケジュール削除API
+    public function apiDelete($params)
+    {
+        $id = $params['id'] ?? 0;
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
+        if (!$schedule) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールが見つかりません'
+            ];
+        }
+
+        // 削除権限チェック
+        $canDelete = $this->canDeleteSchedule($schedule);
+        if (!$canDelete) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの削除権限がありません'
+            ];
+        }
+
+        // スケジュールを削除
+        $result = $this->schedule->delete($id);
+
+        if (!$result) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの削除に失敗しました'
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => 'スケジュールが正常に削除されました',
+            'data' => [
+                'redirect' => BASE_PATH . '/schedule'
+            ]
+        ];
+    }
+
+    // 参加ステータス更新API
+    public function apiUpdateParticipantStatus($params, $data)
+    {
+        $id = $params['id'] ?? 0;
+        $status = $data['status'] ?? '';
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
+        if (!$schedule) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールが見つかりません'
+            ];
+        }
+
+        // 閲覧権限チェック
+        $canView = $this->canViewSchedule($schedule);
+        if (!$canView) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの閲覧権限がありません'
+            ];
+        }
+
+        // ステータスのバリデーション
+        $validStatuses = ['pending', 'accepted', 'declined', 'tentative'];
+        if (!in_array($status, $validStatuses)) {
+            return [
+                'success' => false,
+                'error' => '無効なステータスです'
+            ];
+        }
+
+        // 現在のユーザーIDを取得
+        $userId = $this->auth->id();
+
+        // 参加者かどうかチェック
+        $isParticipant = $this->schedule->isParticipant($id, $userId);
+        if (!$isParticipant) {
+            return [
+                'success' => false,
+                'error' => 'このスケジュールの参加者ではありません'
+            ];
+        }
+
+        // 参加ステータスを更新
+        $result = $this->schedule->updateParticipantStatus($id, $userId, $status);
+
+        if (!$result) {
+            return [
+                'success' => false,
+                'error' => '参加ステータスの更新に失敗しました'
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => '参加ステータスが正常に更新されました',
+            'data' => [
+                'status' => $status
+            ]
+        ];
+    }
+
+    // 参加者追加API
+    public function apiAddParticipant($params, $data)
+    {
+        $id = $params['id'] ?? 0;
+        $userId = $data['user_id'] ?? 0;
+        $status = $data['status'] ?? 'pending';
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
+        if (!$schedule) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールが見つかりません'
+            ];
+        }
+
+        // 編集権限チェック
+        $canEdit = $this->canEditSchedule($schedule);
+        if (!$canEdit) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの編集権限がありません'
+            ];
+        }
+
+        // ユーザーの存在チェック
+        $user = $this->user->getById($userId);
+        if (!$user) {
+            return [
+                'success' => false,
+                'error' => 'ユーザーが見つかりません'
+            ];
+        }
+
+        // ステータスのバリデーション
+        $validStatuses = ['pending', 'accepted', 'declined', 'tentative'];
+        if (!in_array($status, $validStatuses)) {
+            $status = 'pending';
+        }
+
+        // 参加者を追加
+        $result = $this->schedule->addParticipant($id, $userId, $status);
+
+        if (!$result) {
+            return [
+                'success' => false,
+                'error' => '参加者の追加に失敗しました'
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => '参加者が正常に追加されました',
+            'data' => [
+                'user_id' => $userId,
+                'status' => $status
+            ]
+        ];
+    }
+
+    // 参加者削除API
+    public function apiRemoveParticipant($params, $data)
+    {
+        $id = $params['id'] ?? 0;
+        $userId = $data['user_id'] ?? 0;
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
+        if (!$schedule) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールが見つかりません'
+            ];
+        }
+
+        // 権限チェック（作成者、管理者、または自分自身の参加のみ削除可能）
+        $currentUserId = $this->auth->id();
+        $canRemove = ($schedule['creator_id'] == $currentUserId || $this->auth->isAdmin() || $userId == $currentUserId);
+
+        if (!$canRemove) {
+            return [
+                'success' => false,
+                'error' => '参加者の削除権限がありません'
+            ];
+        }
+
+        // 作成者は削除不可
+        if ($userId == $schedule['creator_id']) {
+            return [
+                'success' => false,
+                'error' => '作成者は参加者から削除できません'
+            ];
+        }
+
+        // 参加者を削除
+        $result = $this->schedule->removeParticipant($id, $userId);
+
+        if (!$result) {
+            return [
+                'success' => false,
+                'error' => '参加者の削除に失敗しました'
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => '参加者が正常に削除されました',
+            'data' => [
+                'user_id' => $userId
+            ]
+        ];
+    }
+
+    // 組織共有追加API
+    public function apiAddOrganization($params, $data)
+    {
+        $id = $params['id'] ?? 0;
+        $organizationId = $data['organization_id'] ?? 0;
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
+        if (!$schedule) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールが見つかりません'
+            ];
+        }
+
+        // 編集権限チェック
+        $canEdit = $this->canEditSchedule($schedule);
+        if (!$canEdit) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの編集権限がありません'
+            ];
+        }
+
         // 組織の存在チェック
-        $orgModel = new Organization();
-        $org = $orgModel->getById($data['organization_id']);
-        if (!$org) {
-            return ['error' => 'Organization not found', 'code' => 404];
+        $organization = $this->organization->getById($organizationId);
+        if (!$organization) {
+            return [
+                'success' => false,
+                'error' => '組織が見つかりません'
+            ];
         }
-        
-        $success = $this->model->addOrganization($id, $data['organization_id']);
-        if (!$success) {
-            return ['error' => 'Failed to add organization', 'code' => 500];
+
+        // 組織共有を追加
+        $result = $this->schedule->addSharedOrganization($id, $organizationId);
+
+        if (!$result) {
+            return [
+                'success' => false,
+                'error' => '組織共有の追加に失敗しました'
+            ];
         }
-        
-        return ['success' => true, 'message' => '組織を共有対象に追加しました'];
+
+        return [
+            'success' => true,
+            'message' => '組織共有が正常に追加されました',
+            'data' => [
+                'organization_id' => $organizationId
+            ]
+        ];
     }
-    
-    // API: 組織を共有対象から削除
-    public function apiRemoveOrganization($params, $data) {
-        // 認証チェック
-        if (!$this->auth->check()) {
-            return ['error' => 'Unauthorized', 'code' => 401];
-        }
-        
-        $id = $params['id'] ?? null;
-        if (!$id || empty($data['organization_id'])) {
-            return ['error' => 'Invalid parameters', 'code' => 400];
-        }
-        
-        // スケジュールの存在チェック
-        $schedule = $this->model->getById($id, $this->auth->id());
+
+    // 組織共有削除API
+    public function apiRemoveOrganization($params, $data)
+    {
+        $id = $params['id'] ?? 0;
+        $organizationId = $data['organization_id'] ?? 0;
+
+        // スケジュールデータを取得
+        $schedule = $this->schedule->getById($id);
+
         if (!$schedule) {
-            return ['error' => 'Schedule not found or access denied', 'code' => 404];
+            return [
+                'success' => false,
+                'error' => 'スケジュールが見つかりません'
+            ];
         }
-        
-        // 作成者または管理者のみ組織共有削除可能
-        if ($schedule['creator_id'] != $this->auth->id() && !$this->auth->isAdmin()) {
-            return ['error' => 'Permission denied', 'code' => 403];
+
+        // 編集権限チェック
+        $canEdit = $this->canEditSchedule($schedule);
+        if (!$canEdit) {
+            return [
+                'success' => false,
+                'error' => 'スケジュールの編集権限がありません'
+            ];
         }
-        
-        $success = $this->model->removeOrganization($id, $data['organization_id']);
-        if (!$success) {
-            return ['error' => 'Failed to remove organization', 'code' => 500];
+
+        // 組織共有を削除
+        $result = $this->schedule->removeSharedOrganization($id, $organizationId);
+
+        if (!$result) {
+            return [
+                'success' => false,
+                'error' => '組織共有の削除に失敗しました'
+            ];
         }
-        
-        return ['success' => true, 'message' => '組織を共有対象から削除しました'];
+
+        return [
+            'success' => true,
+            'message' => '組織共有が正常に削除されました',
+            'data' => [
+                'organization_id' => $organizationId
+            ]
+        ];
+    }
+
+    // 日付の妥当性チェック
+    private function isValidDate($date)
+    {
+        if (!$date) return false;
+
+        try {
+            $dt = new \DateTime($date);
+            return $dt && $dt->format('Y-m-d') === $date;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    // スケジュールデータのバリデーション
+    private function validateScheduleData($data)
+    {
+        $errors = [];
+
+        // タイトルは必須
+        if (empty($data['title'])) {
+            $errors['title'] = 'タイトルは必須です';
+        }
+
+        // 開始日時は必須
+        if (empty($data['start_time'])) {
+            $errors['start_time'] = '開始日時は必須です';
+        }
+
+        // 終了日時は必須
+        if (empty($data['end_time'])) {
+            $errors['end_time'] = '終了日時は必須です';
+        }
+
+        // 開始日時 <= 終了日時
+        if (!empty($data['start_time']) && !empty($data['end_time'])) {
+            $startTime = strtotime($data['start_time']);
+            $endTime = strtotime($data['end_time']);
+
+            if ($startTime > $endTime) {
+                $errors['end_time'] = '終了日時は開始日時以降にしてください';
+            }
+        }
+
+        // 繰り返し設定のチェック
+        if (!empty($data['repeat_type']) && $data['repeat_type'] !== 'none') {
+            if (empty($data['repeat_end_date'])) {
+                $errors['repeat_end_date'] = '繰り返し設定を使用する場合は、終了日を設定してください';
+            } else {
+                $repeatEndDate = strtotime($data['repeat_end_date']);
+                $startDate = strtotime(date('Y-m-d', strtotime($data['start_time'])));
+
+                if ($repeatEndDate < $startDate) {
+                    $errors['repeat_end_date'] = '繰り返し終了日は開始日以降にしてください';
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    // スケジュールの閲覧権限チェック
+    private function canViewSchedule($schedule)
+    {
+        if (!$schedule) return false;
+
+        $userId = $this->auth->id();
+
+        // 管理者は全て閲覧可能
+        if ($this->auth->isAdmin()) return true;
+
+        // 自分が作成したスケジュールは閲覧可能
+        if ($schedule['creator_id'] == $userId) return true;
+
+        // 公開スケジュールは閲覧可能
+        if ($schedule['visibility'] === 'public') return true;
+
+        // 非公開スケジュールは作成者のみ閲覧可能
+        if ($schedule['visibility'] === 'private') {
+            return $schedule['creator_id'] == $userId;
+        }
+
+        // 特定ユーザーのみ公開の場合
+        if ($schedule['visibility'] === 'specific') {
+            // 参加者かどうかチェック
+            $isParticipant = $this->schedule->isParticipant($schedule['id'], $userId);
+            if ($isParticipant) return true;
+
+            // 共有組織のメンバーかどうかチェック
+            $sharedOrganizations = $this->schedule->getSharedOrganizations($schedule['id']);
+            $userOrganizations = $this->user->getUserOrganizationIds($userId);
+
+            foreach ($sharedOrganizations as $org) {
+                if (in_array($org['id'], $userOrganizations)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // スケジュールの編集権限チェック
+    private function canEditSchedule($schedule)
+    {
+        if (!$schedule) return false;
+
+        $userId = $this->auth->id();
+
+        // 管理者は全て編集可能
+        if ($this->auth->isAdmin()) return true;
+
+        // 自分が作成したスケジュールのみ編集可能
+        return $schedule['creator_id'] == $userId;
+    }
+
+    // スケジュールの削除権限チェック
+    private function canDeleteSchedule($schedule)
+    {
+        // 編集権限と同じ
+        return $this->canEditSchedule($schedule);
     }
 }

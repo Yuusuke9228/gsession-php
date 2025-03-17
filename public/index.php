@@ -1,7 +1,6 @@
 <?php
 // public/index.php - アプリケーションのエントリーポイント
 
-
 // 基本設定
 session_start();
 date_default_timezone_set('Asia/Tokyo');
@@ -11,7 +10,7 @@ mb_internal_encoding('UTF-8');
 
 // アプリケーションのベースパスを設定
 $basePath = dirname($_SERVER["SCRIPT_NAME"]);
-if ($basePath == "/") $basePath = "/gsession-php/public";
+if ($basePath == "/") $basePath = "";
 define("BASE_PATH", $basePath);
 
 // オートローダー設定
@@ -60,7 +59,7 @@ if (!$auth->check()) {
 // ルーティングの設定
 
 // ホームページ
-$router->get('/', function() use ($auth) {
+$router->get('/', function () use ($auth) {
     if ($auth->check()) {
         header('Location: ' . BASE_PATH . '/schedule');
     } else {
@@ -69,20 +68,20 @@ $router->get('/', function() use ($auth) {
 });
 
 // 認証関連
-$router->get('/login', function() use ($auth) {
+$router->get('/login', function () use ($auth) {
     if ($auth->check()) {
         header('Location: ' . BASE_PATH . '/schedule');
         exit;
     }
-    
+
     require_once __DIR__ . '/../views/auth/login.php';
 });
 
-$router->post('/login', function() use ($auth) {
+$router->post('/login', function () use ($auth) {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
     $remember = isset($_POST['remember']) ? true : false;
-    
+
     if ($auth->login($username, $password, $remember)) {
         $redirect = $_GET['redirect'] ?? '/schedule';
         header('Location: ' . BASE_PATH . $redirect);
@@ -92,90 +91,90 @@ $router->post('/login', function() use ($auth) {
     }
 });
 
-$router->get('/logout', function() use ($auth) {
+$router->get('/logout', function () use ($auth) {
     $auth->logout();
     header('Location: ' . BASE_PATH . '/login');
 });
 
 // 組織管理
-$router->get('/organizations', function() {
+$router->get('/organizations', function () {
     $controller = new Controllers\OrganizationController();
     $controller->index();
 }, true);
 
-$router->get('/organizations/create', function() {
+$router->get('/organizations/create', function () {
     $controller = new Controllers\OrganizationController();
     $controller->create();
 }, true);
 
-$router->get('/organizations/edit/:id', function($params) {
+$router->get('/organizations/edit/:id', function ($params) {
     $controller = new Controllers\OrganizationController();
     $controller->edit($params);
 }, true);
 
-$router->get('/organizations/view/:id', function($params) {
+$router->get('/organizations/view/:id', function ($params) {
     $controller = new Controllers\OrganizationController();
     $controller->view($params);
 }, true);
 
 // ユーザー管理
-$router->get('/users', function() {
+$router->get('/users', function () {
     $controller = new Controllers\UserController();
     $controller->index();
 }, true);
 
-$router->get('/users/create', function() {
+$router->get('/users/create', function () {
     $controller = new Controllers\UserController();
     $controller->create();
 }, true);
 
-$router->get('/users/edit/:id', function($params) {
+$router->get('/users/edit/:id', function ($params) {
     $controller = new Controllers\UserController();
     $controller->edit($params);
 }, true);
 
-$router->get('/users/view/:id', function($params) {
+$router->get('/users/view/:id', function ($params) {
     $controller = new Controllers\UserController();
     $controller->view($params);
 }, true);
 
-$router->get('/users/change-password/:id', function($params) {
+$router->get('/users/change-password/:id', function ($params) {
     $controller = new Controllers\UserController();
     $controller->changePassword($params);
 }, true);
 
 // スケジュール管理
-$router->get('/schedule', function() {
+$router->get('/schedule', function () {
     header('Location:' . BASE_PATH . '/schedule/month');
     exit;
 }, true);
 
-$router->get('/schedule/day', function() {
+$router->get('/schedule/day', function () {
     $controller = new Controllers\ScheduleController();
     $controller->day();
 }, true);
 
-$router->get('/schedule/week', function() {
+$router->get('/schedule/week', function () {
     $controller = new Controllers\ScheduleController();
     $controller->week();
 }, true);
 
-$router->get('/schedule/month', function() {
+$router->get('/schedule/month', function () {
     $controller = new Controllers\ScheduleController();
     $controller->month();
 }, true);
 
-$router->get('/schedule/create', function() {
+$router->get('/schedule/create', function () {
     $controller = new Controllers\ScheduleController();
     $controller->create();
 }, true);
 
-$router->get('/schedule/edit/:id', function($params) {
+$router->get('/schedule/edit/:id', function ($params) {
     $controller = new Controllers\ScheduleController();
     $controller->edit($params);
 }, true);
 
-$router->get('/schedule/view/:id', function($params) {
+$router->get('/schedule/view/:id', function ($params) {
     $controller = new Controllers\ScheduleController();
     $controller->view($params);
 }, true);
@@ -183,154 +182,144 @@ $router->get('/schedule/view/:id', function($params) {
 // API ルート
 
 // 組織管理API
-$router->apiGet('/organizations', function() {
+$router->apiGet('/organizations', function () {
     $controller = new Controllers\OrganizationController();
     return $controller->apiGetAll();
 }, true);
 
-$router->apiGet('/organizations/tree', function() {
+$router->apiGet('/organizations/tree', function () {
     $controller = new Controllers\OrganizationController();
     return $controller->apiGetTree();
 }, true);
 
-$router->apiGet('/organizations/:id', function($params) {
+$router->apiGet('/organizations/:id', function ($params) {
     $controller = new Controllers\OrganizationController();
     return $controller->apiGetOne($params);
 }, true);
 
-$router->apiGet('/organizations/:id/users', function($params) {
-    $controller = new Controllers\OrganizationController();
-    return $controller->apiGetUsers($params);
-}, true);
-
-$router->apiPost('/organizations', function($params, $data) {
+$router->apiPost('/organizations', function ($params, $data) {
     $controller = new Controllers\OrganizationController();
     return $controller->apiCreate($params, $data);
 }, true);
 
-$router->apiPost('/organizations/:id', function($params, $data) {
+$router->apiPost('/organizations/:id', function ($params, $data) {
     $controller = new Controllers\OrganizationController();
     return $controller->apiUpdate($params, $data);
 }, true);
 
-$router->apiDelete('/organizations/:id', function($params) {
+$router->apiDelete('/organizations/:id', function ($params) {
     $controller = new Controllers\OrganizationController();
     return $controller->apiDelete($params);
 }, true);
 
-$router->apiPost('/organizations/:id/move', function($params, $data) {
+$router->apiPost('/organizations/:id/move', function ($params, $data) {
     $controller = new Controllers\OrganizationController();
     return $controller->apiUpdateOrder($params, $data);
 }, true);
 
-$router->apiGet('/organizations/check-code', function($params) {
-    $controller = new Controllers\OrganizationController();
-    return $controller->apiCheckCodeUnique($params);
-}, true);
-
 // ユーザー管理API
-$router->apiGet('/users', function($params) {
+$router->apiGet('/users', function ($params) {
     $controller = new Controllers\UserController();
     return $controller->apiGetAll($params);
 }, true);
 
-$router->apiGet('/users/:id', function($params) {
+$router->apiGet('/users/:id', function ($params) {
     $controller = new Controllers\UserController();
     return $controller->apiGetOne($params);
 }, true);
 
-$router->apiGet('/users/:id/organizations', function($params) {
+$router->apiGet('/users/:id/organizations', function ($params) {
     $controller = new Controllers\UserController();
     return $controller->apiGetUserOrganizations($params);
 }, true);
 
-$router->apiPost('/users', function($params, $data) {
+$router->apiPost('/users', function ($params, $data) {
     $controller = new Controllers\UserController();
     return $controller->apiCreate($params, $data);
 }, true);
 
-$router->apiPost('/users/:id', function($params, $data) {
+$router->apiPost('/users/:id', function ($params, $data) {
     $controller = new Controllers\UserController();
     return $controller->apiUpdate($params, $data);
 }, true);
 
-$router->apiDelete('/users/:id', function($params) {
+$router->apiDelete('/users/:id', function ($params) {
     $controller = new Controllers\UserController();
     return $controller->apiDelete($params);
 }, true);
 
-$router->apiPost('/users/:id/change-password', function($params, $data) {
+$router->apiPost('/users/:id/change-password', function ($params, $data) {
     $controller = new Controllers\UserController();
     return $controller->apiChangePassword($params, $data);
 }, true);
 
-$router->apiPost('/users/:id/primary-organization', function($params, $data) {
+$router->apiPost('/users/:id/primary-organization', function ($params, $data) {
     $controller = new Controllers\UserController();
     return $controller->apiChangePrimaryOrganization($params, $data);
 }, true);
 
 // スケジュール管理API
-$router->apiGet('/schedule/day', function($params) {
+$router->apiGet('/schedule/day', function ($params) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiGetDay($params);
 }, true);
 
-$router->apiGet('/schedule/week', function($params) {
+$router->apiGet('/schedule/week', function ($params) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiGetWeek($params);
 }, true);
 
-$router->apiGet('/schedule/month', function($params) {
+$router->apiGet('/schedule/month', function ($params) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiGetMonth($params);
 }, true);
 
-$router->apiGet('/schedule/range', function($params) {
+$router->apiGet('/schedule/range', function ($params) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiGetByDateRange($params);
 }, true);
 
-$router->apiGet('/schedule/:id', function($params) {
+$router->apiGet('/schedule/:id', function ($params) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiGetOne($params);
 }, true);
 
-$router->apiPost('/schedule', function($params, $data) {
+$router->apiPost('/schedule', function ($params, $data) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiCreate($params, $data);
 }, true);
 
-$router->apiPost('/schedule/:id', function($params, $data) {
+$router->apiPost('/schedule/:id', function ($params, $data) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiUpdate($params, $data);
 }, true);
 
-$router->apiDelete('/schedule/:id', function($params) {
+$router->apiDelete('/schedule/:id', function ($params) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiDelete($params);
 }, true);
 
-$router->apiPost('/schedule/:id/participation-status', function($params, $data) {
+$router->apiPost('/schedule/:id/participation-status', function ($params, $data) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiUpdateParticipantStatus($params, $data);
 }, true);
 
-$router->apiPost('/schedule/:id/participants', function($params, $data) {
+$router->apiPost('/schedule/:id/participants', function ($params, $data) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiAddParticipant($params, $data);
 }, true);
 
-$router->apiDelete('/schedule/:id/participants', function($params, $data) {
+$router->apiDelete('/schedule/:id/participants', function ($params, $data) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiRemoveParticipant($params, $data);
 }, true);
 
-$router->apiPost('/schedule/:id/organizations', function($params, $data) {
+$router->apiPost('/schedule/:id/organizations', function ($params, $data) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiAddOrganization($params, $data);
 }, true);
 
-$router->apiDelete('/schedule/:id/organizations', function($params, $data) {
+$router->apiDelete('/schedule/:id/organizations', function ($params, $data) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiRemoveOrganization($params, $data);
 }, true);
