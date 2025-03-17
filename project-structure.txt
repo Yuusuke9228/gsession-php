@@ -1,0 +1,36 @@
+gsession-php/
+├── config/                 # 設定ファイル
+│   ├── config.php          # 基本設定
+│   └── database.php        # データベース設定
+├── core/                   # コアシステム
+│   ├── Auth.php            # 認証クラス
+│   ├── Database.php        # データベース接続
+│   └── Router.php          # ルーティング
+├── models/                 # モデル
+│   ├── Organization.php    # 組織モデル
+│   ├── User.php            # ユーザーモデル
+│   └── Schedule.php        # スケジュールモデル
+├── controllers/            # コントローラー
+│   ├── OrganizationController.php
+│   ├── UserController.php
+│   └── ScheduleController.php
+├── views/                  # ビュー
+│   ├── layouts/            # レイアウトテンプレート
+│   ├── organization/       # 組織管理画面
+│   ├── user/               # ユーザー管理画面
+│   └── schedule/           # スケジュール管理画面
+├── public/                 # 公開ディレクトリ
+│   ├── index.php           # エントリーポイント
+│   ├── css/                # スタイルシート
+│   ├── js/                 # JavaScriptファイル
+│   │   ├── app.js          # メインJSファイル
+│   │   ├── organization.js # 組織管理JS
+│   │   ├── user.js         # ユーザー管理JS
+│   │   └── schedule.js     # スケジュール管理JS
+│   └── img/                # 画像ファイル
+├── api/                    # API エンドポイント
+│   ├── organization.php    # 組織管理API
+│   ├── user.php            # ユーザー管理API
+│   └── schedule.php        # スケジュール管理API
+└── db/                     # データベース関連
+    └── schema.sql          # データベーススキーマ
