@@ -83,7 +83,7 @@ class OrganizationController extends Controller
         $this->view('organization/edit', $viewData);
     }
 
-    // 組織の詳細ページを表示 (メソッド名を変更)
+    // 組織の詳細ページを表示
     public function viewDetails($params)
     {
         $id = $params['id'] ?? null;

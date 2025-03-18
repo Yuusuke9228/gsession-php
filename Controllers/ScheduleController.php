@@ -22,7 +22,7 @@ class ScheduleController extends Controller
         parent::__construct();
 
         $this->db = Database::getInstance();
-        // $this->auth = Auth::getInstance(); は削除します（親クラスで設定済み）
+        // $this->auth = Auth::getInstance(); は削除（親クラスで設定済み）
         $this->schedule = new Schedule();
         $this->user = new User();
         $this->organization = new Organization();
