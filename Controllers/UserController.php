@@ -18,7 +18,7 @@ class UserController extends Controller
 
         // 認証チェック（ログインページ以外で）
         if (!$this->auth->check()) {
-            $this->redirect('/login');
+            $this->redirect(BASE_PATH . '/login');
         }
     }
 
@@ -56,7 +56,7 @@ class UserController extends Controller
     {
         // 権限チェック
         if (!$this->auth->isAdmin()) {
-            $this->redirect('/users');
+            $this->redirect(BASE_PATH . '/users');
         }
 
         // 組織リストを取得
@@ -77,18 +77,18 @@ class UserController extends Controller
     {
         $id = $params['id'] ?? null;
         if (!$id) {
-            $this->redirect('/users');
+            $this->redirect(BASE_PATH . '/users');
         }
 
         // 権限チェック（管理者または自分自身の編集のみ許可）
         if (!$this->auth->isAdmin() && $this->auth->id() != $id) {
-            $this->redirect('/users');
+            $this->redirect(BASE_PATH . '/users');
         }
 
         // ユーザー情報を取得
         $user = $this->model->getById($id);
         if (!$user) {
-            $this->redirect('/users');
+            $this->redirect(BASE_PATH . '/users');
         }
 
         // ユーザーの所属組織を取得
@@ -98,7 +98,7 @@ class UserController extends Controller
         // 主組織のID
         $primaryOrgId = null;
         foreach ($userOrganizations as $org) {
-            if ($org['is_primary']) {
+            if (isset($org['is_primary']) && $org['is_primary']) {
                 $primaryOrgId = $org['id'];
                 break;
             }
@@ -121,18 +121,18 @@ class UserController extends Controller
         $this->view('user/edit', $viewData);
     }
 
-    // ユーザーの詳細ページを表示
-    public function view($params)
+    // ユーザーの詳細ページを表示 (メソッド名を変更)
+    public function viewDetails($params)
     {
         $id = $params['id'] ?? null;
         if (!$id) {
-            $this->redirect('/users');
+            $this->redirect(BASE_PATH . '/users');
         }
 
         // ユーザー情報を取得
         $user = $this->model->getById($id);
         if (!$user) {
-            $this->redirect('/users');
+            $this->redirect(BASE_PATH . '/users');
         }
 
         // ユーザーの所属組織を取得
@@ -153,18 +153,18 @@ class UserController extends Controller
     {
         $id = $params['id'] ?? null;
         if (!$id) {
-            $this->redirect('/users');
+            $this->redirect(BASE_PATH . '/users');
         }
 
         // 権限チェック（管理者または自分自身のパスワード変更のみ許可）
         if (!$this->auth->isAdmin() && $this->auth->id() != $id) {
-            $this->redirect('/users');
+            $this->redirect(BASE_PATH . '/users');
         }
 
         // ユーザー情報を取得
         $user = $this->model->getById($id);
         if (!$user) {
-            $this->redirect('/users');
+            $this->redirect(BASE_PATH . '/users');
         }
 
         $viewData = [

@@ -114,7 +114,7 @@ $router->get('/organizations/edit/:id', function ($params) {
 
 $router->get('/organizations/view/:id', function ($params) {
     $controller = new Controllers\OrganizationController();
-    $controller->view($params);
+    $controller->viewDetails($params);
 }, true);
 
 // ユーザー管理
@@ -135,7 +135,7 @@ $router->get('/users/edit/:id', function ($params) {
 
 $router->get('/users/view/:id', function ($params) {
     $controller = new Controllers\UserController();
-    $controller->view($params);
+    $controller->viewDetails($params);
 }, true);
 
 $router->get('/users/change-password/:id', function ($params) {
@@ -176,7 +176,7 @@ $router->get('/schedule/edit/:id', function ($params) {
 
 $router->get('/schedule/view/:id', function ($params) {
     $controller = new Controllers\ScheduleController();
-    $controller->view($params);
+    $controller->viewDetails($params);
 }, true);
 
 // API ルート
@@ -215,6 +215,12 @@ $router->apiDelete('/organizations/:id', function ($params) {
 $router->apiPost('/organizations/:id/move', function ($params, $data) {
     $controller = new Controllers\OrganizationController();
     return $controller->apiUpdateOrder($params, $data);
+}, true);
+
+// 組織コード重複チェックAPI
+$router->apiGet('/organizations/check-code', function ($params) {
+    $controller = new Controllers\OrganizationController();
+    return $controller->apiCheckCodeUnique($params);
 }, true);
 
 // ユーザー管理API
@@ -322,6 +328,12 @@ $router->apiPost('/schedule/:id/organizations', function ($params, $data) {
 $router->apiDelete('/schedule/:id/organizations', function ($params, $data) {
     $controller = new Controllers\ScheduleController();
     return $controller->apiRemoveOrganization($params, $data);
+}, true);
+
+// アクティブユーザー取得API
+$router->apiGet('/active-users', function () {
+    $controller = new Controllers\UserController();
+    return $controller->apiGetActiveUsers();
 }, true);
 
 // リクエストのディスパッチ（ルーティング処理の実行）

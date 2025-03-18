@@ -12,7 +12,7 @@ use Models\Organization;
 class ScheduleController extends Controller
 {
     private $db;
-    private $auth;
+    // private $auth;
     private $schedule;
     private $user;
     private $organization;
@@ -22,14 +22,14 @@ class ScheduleController extends Controller
         parent::__construct();
 
         $this->db = Database::getInstance();
-        $this->auth = Auth::getInstance();
+        // $this->auth = Auth::getInstance(); は削除します（親クラスで設定済み）
         $this->schedule = new Schedule();
         $this->user = new User();
         $this->organization = new Organization();
 
         // ユーザーがログインしていない場合はログインページにリダイレクト
         if (!$this->auth->check()) {
-            $this->redirect('/login');
+            $this->redirect(BASE_PATH . '/login');
         }
     }
 
@@ -344,22 +344,24 @@ class ScheduleController extends Controller
         $this->view('schedule/form', $viewData);
     }
 
-    // スケジュール詳細表示
-    public function view($params)
+    // 組織の詳細ページを表示 (メソッド名を変更)
+    public function viewDetails($params)
     {
-        $id = $params['id'] ?? 0;
+        $id = $params['id'] ?? null;
+        if (!$id) {
+            $this->redirect(BASE_PATH . '/schedule');
+        }
 
         // スケジュールデータを取得
         $schedule = $this->schedule->getById($id);
-
         if (!$schedule) {
-            $this->redirect('/schedule');
+            $this->redirect(BASE_PATH . '/schedule');
         }
 
         // 閲覧権限チェック
         $canView = $this->canViewSchedule($schedule);
         if (!$canView) {
-            $this->redirect('/schedule');
+            $this->redirect(BASE_PATH . '/schedule');
         }
 
         // 編集権限チェック
@@ -390,6 +392,7 @@ class ScheduleController extends Controller
 
         $this->view('schedule/view', $viewData);
     }
+
 
     // 日単位スケジュールAPI
     public function apiGetDay($params)

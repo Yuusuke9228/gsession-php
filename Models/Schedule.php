@@ -497,4 +497,84 @@ class Schedule
 
         return $this->getByDateRange($startOfMonth, $endOfMonth, $userId);
     }
+
+    // Models/Schedule.php に追加するメソッド
+
+    // 共有組織を取得するメソッド
+    public function getSharedOrganizations($scheduleId)
+    {
+        $sql = "SELECT o.* 
+            FROM schedule_organizations so 
+            JOIN organizations o ON so.organization_id = o.id 
+            WHERE so.schedule_id = ? 
+            ORDER BY o.name";
+
+        return $this->db->fetchAll($sql, [$scheduleId]);
+    }
+
+    // ユーザーの参加ステータスを取得するメソッド
+    public function getUserParticipationStatus($scheduleId, $userId)
+    {
+        $sql = "SELECT status 
+            FROM schedule_participants 
+            WHERE schedule_id = ? AND user_id = ? 
+            LIMIT 1";
+
+        $result = $this->db->fetch($sql, [$scheduleId, $userId]);
+        return $result ? $result['status'] : 'pending';
+    }
+
+    // ユーザーが参加者かどうかをチェックするメソッド
+    public function isParticipant($scheduleId, $userId)
+    {
+        $sql = "SELECT COUNT(*) as count 
+            FROM schedule_participants 
+            WHERE schedule_id = ? AND user_id = ?";
+
+        $result = $this->db->fetch($sql, [$scheduleId, $userId]);
+        return $result && $result['count'] > 0;
+    }
+
+    // すべての参加者を削除するメソッド
+    public function removeAllParticipants($scheduleId)
+    {
+        return $this->db->execute("DELETE FROM schedule_participants WHERE schedule_id = ?", [$scheduleId]);
+    }
+
+    // すべての共有組織を削除するメソッド
+    public function removeAllSharedOrganizations($scheduleId)
+    {
+        return $this->db->execute("DELETE FROM schedule_organizations WHERE schedule_id = ?", [$scheduleId]);
+    }
+    //ここから
+    // 特定の日付のスケジュールを取得
+    public function getByDay($date, $userId = null)
+    {
+        // 日付の0時と23時59分59秒を取得
+        $startOfDay = $date . ' 00:00:00';
+        $endOfDay = $date . ' 23:59:59';
+
+        return $this->getByDateRange($startOfDay, $endOfDay, $userId);
+    }
+
+    // スケジュールに共有組織を追加
+    public function addSharedOrganization($scheduleId, $organizationId)
+    {
+        $sql = "INSERT IGNORE INTO schedule_organizations (
+                schedule_id, 
+                organization_id,
+                created_at
+            ) VALUES (?, ?, NOW())";
+
+        return $this->db->execute($sql, [$scheduleId, $organizationId]);
+    }
+
+    // スケジュールから共有組織を削除
+    public function removeSharedOrganization($scheduleId, $organizationId)
+    {
+        $sql = "DELETE FROM schedule_organizations 
+            WHERE schedule_id = ? AND organization_id = ?";
+
+        return $this->db->execute($sql, [$scheduleId, $organizationId]);
+    }
 }

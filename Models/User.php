@@ -437,4 +437,26 @@ class User {
         
         return $this->db->fetchAll($sql, $orgIds);
     }
+
+    // アクティブなユーザー一覧を取得するメソッド
+    public function getActiveUsers()
+    {
+        $sql = "SELECT id, username, display_name, email 
+            FROM users 
+            WHERE status = 'active' 
+            ORDER BY display_name";
+
+        return $this->db->fetchAll($sql);
+    }
+
+    // ユーザーの所属組織IDのリストを取得するメソッド
+    public function getUserOrganizationIds($userId)
+    {
+        $sql = "SELECT organization_id 
+            FROM user_organizations 
+            WHERE user_id = ?";
+
+        $result = $this->db->fetchAll($sql, [$userId]);
+        return array_column($result, 'organization_id');
+    }
 }

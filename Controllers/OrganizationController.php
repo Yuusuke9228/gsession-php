@@ -18,7 +18,7 @@ class OrganizationController extends Controller
 
         // 認証チェック
         if (!$this->auth->check()) {
-            $this->redirect('/login');
+            $this->redirect(BASE_PATH . '/login');
         }
     }
 
@@ -57,13 +57,13 @@ class OrganizationController extends Controller
     {
         $id = $params['id'] ?? null;
         if (!$id) {
-            $this->redirect('/organizations');
+            $this->redirect(BASE_PATH . '/organizations');
         }
 
         // 編集対象の組織を取得
         $organization = $this->model->getById($id);
         if (!$organization) {
-            $this->redirect('/organizations');
+            $this->redirect(BASE_PATH . '/organizations');
         }
 
         // 親組織の選択用に全組織を取得（自分自身と子孫は除外）
@@ -83,18 +83,18 @@ class OrganizationController extends Controller
         $this->view('organization/edit', $viewData);
     }
 
-    // 組織の詳細ページを表示
-    public function view($params)
+    // 組織の詳細ページを表示 (メソッド名を変更)
+    public function viewDetails($params)
     {
         $id = $params['id'] ?? null;
         if (!$id) {
-            $this->redirect('/organizations');
+            $this->redirect(BASE_PATH . '/organizations');
         }
 
         // 組織情報を取得
         $organization = $this->model->getById($id);
         if (!$organization) {
-            $this->redirect('/organizations');
+            $this->redirect(BASE_PATH . '/organizations');
         }
 
         // 親組織情報を取得

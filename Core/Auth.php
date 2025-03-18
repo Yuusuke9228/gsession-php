@@ -35,16 +35,6 @@ class Auth
         $sql = "SELECT * FROM users WHERE username = ? AND status = 'active' LIMIT 1";
         $user = $this->db->fetch($sql, [$username]);
 
-        // デバッグ情報
-        error_log("ログイン試行: ユーザー名 = $username");
-        if ($user) {
-            error_log("ユーザーID: {$user['id']}, ステータス: {$user['status']}");
-            $passwordCheck = password_verify($password, $user['password']);
-            error_log("パスワード検証結果: " . ($passwordCheck ? 'true' : 'false'));
-        } else {
-            error_log("ユーザー見つからず");
-        }
-
         if ($user && password_verify($password, $user['password'])) {
             // セッションにユーザー情報を保存
             $_SESSION['user_id'] = $user['id'];

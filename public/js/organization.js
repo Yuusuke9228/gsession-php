@@ -1,4 +1,3 @@
-var BASE_PATH = "<?php echo BASE_PATH; ?>";
 /**
  * GroupSession PHP - 組織管理JS
  */
@@ -6,14 +5,14 @@ var BASE_PATH = "<?php echo BASE_PATH; ?>";
 const Organization = {
     // データテーブル
     dataTable: null,
-    
+
     // ツリービュー
     treeView: null,
-    
+
     // 初期化
-    init: function() {
+    init: function () {
         const page = $('[data-page-type]').data('page-type');
-        
+
         // ページタイプに応じた初期化
         switch (page) {
             case 'index':
@@ -30,69 +29,69 @@ const Organization = {
                 break;
         }
     },
-    
+
     // 一覧ページの初期化
-    initIndex: function() {
+    initIndex: function () {
         // 組織ツリーの初期化
         this.initOrganizationTree();
-        
+
         // モーダルフォームのイベントハンドラ設定
         this.initModalForms();
-        
+
         // 新規作成ボタンのイベントハンドラ
-        $('#btn-create-organization').on('click', function() {
+        $('#btn-create-organization').on('click', function () {
             $('#create-organization-modal').modal('show');
         });
-        
+
         // 編集ボタンのイベントハンドラ
-        $(document).on('click', '.btn-edit-organization', function() {
+        $(document).on('click', '.btn-edit-organization', function () {
             const id = $(this).data('id');
             Organization.loadOrganizationData(id);
         });
-        
+
         // 削除ボタンのイベントハンドラは app.js で共通処理
     },
-    
+
     // フォームページの初期化
-    initForm: function() {
+    initForm: function () {
         // 親組織セレクトボックスの初期化
         this.initParentOrgSelect();
-        
+
         // コード入力フィールドの自動生成
-        $('#name').on('input', function() {
+        $('#name').on('input', function () {
             if ($('#code').val() === '') {
                 const name = $(this).val();
                 const code = Organization.generateCode(name);
                 $('#code').val(code);
             }
         });
-        
+
         // コード重複チェック
-        $('#code').on('blur', function() {
+        $('#code').on('blur', function () {
             const code = $(this).val();
             const id = $('#id').val(); // 編集時はIDがある
-            
+
             if (code !== '') {
                 Organization.checkCodeUnique(code, id);
             }
         });
     },
-    
+
     // 詳細ページの初期化
-    initView: function() {
+    initView: function () {
         // ユーザーリストの初期化
         this.initUserTable();
     },
-    
+
     // 組織ツリーの初期化
-    initOrganizationTree: function() {
+    initOrganizationTree: function () {
         // 組織ツリーを取得
         App.apiGet('/organizations/tree')
             .then(response => {
                 if (response.success) {
                     // ツリーデータを構築
                     const treeData = this.buildTreeData(response.data);
-                    
+
                     // ツリービューを初期化
                     $('#organization-tree').jstree({
                         'core': {
@@ -112,31 +111,31 @@ const Organization = {
                             'items': this.customMenu
                         },
                         'dnd': {
-                            'is_draggable': function(node) {
+                            'is_draggable': function (node) {
                                 return true; // すべてのノードをドラッグ可能に
                             }
                         }
                     })
-                    .on('loaded.jstree', function() {
-                        // ツリーを展開
-                        $(this).jstree('open_all');
-                    })
-                    .on('select_node.jstree', function(e, data) {
-                        // ノード選択時のイベント処理
-                        const id = data.node.id;
-                        window.location.href = '/organizations/view/' + id;
-                    })
-                    .on('move_node.jstree', function(e, data) {
-                        // ノード移動時のイベント処理
-                        Organization.moveNode(data);
-                    });
-                    
+                        .on('loaded.jstree', function () {
+                            // ツリーを展開
+                            $(this).jstree('open_all');
+                        })
+                        .on('select_node.jstree', function (e, data) {
+                            // ノード選択時のイベント処理
+                            const id = data.node.id;
+                            window.location.href = BASE_PATH + '/organizations/view/' + id;
+                        })
+                        .on('move_node.jstree', function (e, data) {
+                            // ノード移動時のイベント処理
+                            Organization.moveNode(data);
+                        });
+
                     // 検索機能
-                    $('#organization-search').on('keyup', function() {
+                    $('#organization-search').on('keyup', function () {
                         const searchString = $(this).val();
                         $('#organization-tree').jstree('search', searchString);
                     });
-                    
+
                     // 参照として保存
                     this.treeView = $('#organization-tree').jstree(true);
                 } else {
@@ -148,40 +147,40 @@ const Organization = {
                 console.error(error);
             });
     },
-    
+
     // モーダルフォームの初期化
-    initModalForms: function() {
+    initModalForms: function () {
         // 親組織選択のセレクトボックス初期化
         this.initParentOrgSelect();
-        
+
         // 作成モーダルのコード自動生成
-        $('#create-organization-modal #name').on('input', function() {
+        $('#create-organization-modal #name').on('input', function () {
             if ($('#create-organization-modal #code').val() === '') {
                 const name = $(this).val();
                 const code = Organization.generateCode(name);
                 $('#create-organization-modal #code').val(code);
             }
         });
-        
+
         // 編集モーダルのコード自動生成
-        $('#edit-organization-modal #name').on('input', function() {
+        $('#edit-organization-modal #name').on('input', function () {
             if ($('#edit-organization-modal #code').data('original') === $('#edit-organization-modal #code').val()) {
                 const name = $(this).val();
                 const code = Organization.generateCode(name);
                 $('#edit-organization-modal #code').val(code);
             }
         });
-        
+
         // コード重複チェック（作成モーダル）
-        $('#create-organization-modal #code').on('blur', function() {
+        $('#create-organization-modal #code').on('blur', function () {
             const code = $(this).val();
             if (code !== '') {
                 Organization.checkCodeUnique(code);
             }
         });
-        
+
         // コード重複チェック（編集モーダル）
-        $('#edit-organization-modal #code').on('blur', function() {
+        $('#edit-organization-modal #code').on('blur', function () {
             const code = $(this).val();
             const id = $('#edit-organization-modal #id').val();
             if (code !== '') {
@@ -189,36 +188,36 @@ const Organization = {
             }
         });
     },
-    
+
     // 親組織セレクトボックスの初期化
-    initParentOrgSelect: function() {
+    initParentOrgSelect: function () {
         // 組織リストを取得
         App.apiGet('/organizations')
             .then(response => {
                 if (response.success) {
                     const organizations = response.data;
-                    
+
                     // 作成フォームのセレクトボックスを更新
                     const createSelect = $('#create-organization-modal #parent_id, #parent_id');
                     if (createSelect.length) {
                         createSelect.empty();
                         createSelect.append('<option value="">なし（トップレベル）</option>');
-                        
+
                         organizations.forEach(org => {
                             createSelect.append(`<option value="${org.id}">${org.name}</option>`);
                         });
                     }
-                    
+
                     // 編集フォームのセレクトボックスを更新
                     const editSelect = $('#edit-organization-modal #parent_id');
                     if (editSelect.length) {
                         const currentId = $('#edit-organization-modal #id').val();
                         const excludeIds = this.getDescendantIds(organizations, currentId);
                         excludeIds.push(currentId); // 自分自身も除外
-                        
+
                         editSelect.empty();
                         editSelect.append('<option value="">なし（トップレベル）</option>');
-                        
+
                         organizations.forEach(org => {
                             if (!excludeIds.includes(org.id)) {
                                 editSelect.append(`<option value="${org.id}">${org.name}</option>`);
@@ -234,18 +233,18 @@ const Organization = {
                 console.error(error);
             });
     },
-    
+
     // ユーザーテーブルの初期化
-    initUserTable: function() {
+    initUserTable: function () {
         const orgId = $('#organization-id').val();
-        
+
         // データテーブルを初期化
         this.dataTable = $('#users-table').DataTable({
             processing: true,
             serverSide: false, // サーバーサイド処理は実装しない
             ajax: {
                 url: App.config.apiEndpoint + '/organizations/' + orgId + '/users',
-                dataSrc: function(json) {
+                dataSrc: function (json) {
                     return json.data || [];
                 }
             },
@@ -255,14 +254,14 @@ const Organization = {
                 { data: 'display_name' },
                 { data: 'email' },
                 { data: 'status' },
-                { 
+                {
                     data: null,
-                    render: function(data, type, row) {
+                    render: function (data, type, row) {
                         return `
-                            <a href="/users/view/${row.id}" class="btn btn-sm btn-info">
+                            <a href="${BASE_PATH}/users/view/${row.id}" class="btn btn-sm btn-info">
                                 <i class="fas fa-eye"></i>
                             </a>
-                            <a href="/users/edit/${row.id}" class="btn btn-sm btn-primary">
+                            <a href="${BASE_PATH}/users/edit/${row.id}" class="btn btn-sm btn-primary">
                                 <i class="fas fa-edit"></i>
                             </a>
                         `;
@@ -271,18 +270,18 @@ const Organization = {
             ],
             order: [[2, 'asc']], // 表示名でソート
             language: {
-                url: '/js/vendor/dataTables.japanese.json'
+                url: BASE_PATH + '/js/vendor/dataTables.japanese.json'
             }
         });
     },
-    
+
     // 組織データを読み込む（編集モーダル用）
-    loadOrganizationData: function(id) {
+    loadOrganizationData: function (id) {
         App.apiGet('/organizations/' + id)
             .then(response => {
                 if (response.success) {
                     const org = response.data;
-                    
+
                     // フォームに値をセット
                     $('#edit-organization-modal #id').val(org.id);
                     $('#edit-organization-modal #name').val(org.name);
@@ -290,7 +289,7 @@ const Organization = {
                     $('#edit-organization-modal #code').data('original', org.code);
                     $('#edit-organization-modal #parent_id').val(org.parent_id || '');
                     $('#edit-organization-modal #description').val(org.description || '');
-                    
+
                     // モーダルを表示
                     $('#edit-organization-modal').modal('show');
                 } else {
@@ -302,9 +301,9 @@ const Organization = {
                 console.error(error);
             });
     },
-    
+
     // ツリーデータの構築
-    buildTreeData: function(organizations) {
+    buildTreeData: function (organizations) {
         // IDでインデックス化
         const orgMap = {};
         organizations.forEach(org => {
@@ -315,49 +314,49 @@ const Organization = {
                 data: org
             };
         });
-        
+
         // ツリーデータの配列を生成
         const treeData = [];
         for (const id in orgMap) {
             treeData.push(orgMap[id]);
         }
-        
+
         return treeData;
     },
-    
+
     // コードの自動生成
-    generateCode: function(name) {
+    generateCode: function (name) {
         if (!name) return '';
-        
+
         // 英数字とアンダースコアのみ許可し、空白をアンダースコアに変換
         let code = name
             .replace(/[^\w\s]/g, '') // 英数字とアンダースコア以外を削除
             .replace(/\s+/g, '_')    // 空白をアンダースコアに変換
             .toUpperCase();          // 大文字に変換
-        
+
         // 20文字に制限
         if (code.length > 20) {
             code = code.substring(0, 20);
         }
-        
+
         return code;
     },
-    
+
     // コードの重複チェック
-    checkCodeUnique: function(code, id = null) {
+    checkCodeUnique: function (code, id = null) {
         const url = '/organizations/check-code';
         const params = { code: code };
-        
+
         if (id) {
             params.id = id;
         }
-        
+
         App.apiGet(url, params)
             .then(response => {
-                const codeInput = $('#code').length ? $('#code') : 
-                                 $('#create-organization-modal #code').length ? $('#create-organization-modal #code') : 
-                                 $('#edit-organization-modal #code');
-                
+                const codeInput = $('#code').length ? $('#code') :
+                    $('#create-organization-modal #code').length ? $('#create-organization-modal #code') :
+                        $('#edit-organization-modal #code');
+
                 if (response.success && response.data.unique) {
                     // 重複なし
                     codeInput.removeClass('is-invalid').addClass('is-valid');
@@ -372,16 +371,16 @@ const Organization = {
                 console.error(error);
             });
     },
-    
+
     // コンテキストメニューのカスタマイズ
-    customMenu: function(node) {
+    customMenu: function (node) {
         const items = {
             create: {
                 label: "新規作成",
-                action: function(data) {
+                action: function (data) {
                     const inst = $.jstree.reference(data.reference);
                     const node = inst.get_node(data.reference);
-                    
+
                     // 作成モーダルを表示し、親組織として選択
                     $('#create-organization-modal #parent_id').val(node.id);
                     $('#create-organization-modal').modal('show');
@@ -389,26 +388,26 @@ const Organization = {
             },
             edit: {
                 label: "編集",
-                action: function(data) {
+                action: function (data) {
                     const inst = $.jstree.reference(data.reference);
                     const node = inst.get_node(data.reference);
-                    
+
                     // 編集モーダルにデータを読み込む
                     Organization.loadOrganizationData(node.id);
                 }
             },
             delete: {
                 label: "削除",
-                action: function(data) {
+                action: function (data) {
                     const inst = $.jstree.reference(data.reference);
                     const node = inst.get_node(data.reference);
-                    
+
                     // 子ノードがある場合は削除不可
                     if (inst.is_parent(node)) {
                         App.showNotification('子組織がある組織は削除できません', 'warning');
                         return;
                     }
-                    
+
                     // 削除確認
                     if (confirm('本当に削除しますか？')) {
                         App.apiDelete('/organizations/' + node.id)
@@ -429,49 +428,49 @@ const Organization = {
             },
             view: {
                 label: "詳細",
-                action: function(data) {
+                action: function (data) {
                     const inst = $.jstree.reference(data.reference);
                     const node = inst.get_node(data.reference);
-                    
+
                     // 詳細ページに遷移
-                    window.location.href = '/organizations/view/' + node.id;
+                    window.location.href = BASE_PATH + '/organizations/view/' + node.id;
                 }
             }
         };
-        
+
         return items;
     },
-    
+
     // ノードの移動（親変更）
-    moveNode: function(data) {
+    moveNode: function (data) {
         const nodeId = data.node.id;
         const newParentId = data.parent === '#' ? '' : data.parent;
-        
+
         // API経由で親組織を更新
         App.apiPost('/organizations/' + nodeId + '/move', {
             parent_id: newParentId
         })
-        .then(response => {
-            if (response.success) {
-                App.showNotification(response.message || '組織の位置を更新しました', 'success');
-            } else {
-                App.showNotification(response.error || 'エラーが発生しました', 'error');
+            .then(response => {
+                if (response.success) {
+                    App.showNotification(response.message || '組織の位置を更新しました', 'success');
+                } else {
+                    App.showNotification(response.error || 'エラーが発生しました', 'error');
+                    // 失敗したら元の位置に戻す
+                    this.treeView.refresh();
+                }
+            })
+            .catch(error => {
+                App.showNotification('エラーが発生しました', 'error');
+                console.error(error);
                 // 失敗したら元の位置に戻す
                 this.treeView.refresh();
-            }
-        })
-        .catch(error => {
-            App.showNotification('エラーが発生しました', 'error');
-            console.error(error);
-            // 失敗したら元の位置に戻す
-            this.treeView.refresh();
-        });
+            });
     },
-    
+
     // 組織の子孫IDリストを取得
-    getDescendantIds: function(organizations, parentId) {
+    getDescendantIds: function (organizations, parentId) {
         const result = [];
-        
+
         const findDescendants = (pid) => {
             organizations.forEach(org => {
                 if (org.parent_id == pid) {
@@ -480,7 +479,7 @@ const Organization = {
                 }
             });
         };
-        
+
         findDescendants(parentId);
         return result;
     }
