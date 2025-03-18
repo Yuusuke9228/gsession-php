@@ -72,23 +72,22 @@ class UserController extends Controller
         $this->view('user/create', $viewData);
     }
 
-    // ユーザー編集ページを表示
     public function edit($params)
     {
         $id = $params['id'] ?? null;
         if (!$id) {
-            $this->redirect(BASE_PATH . '/users');
+            $this->redirect('/users');
         }
 
         // 権限チェック（管理者または自分自身の編集のみ許可）
         if (!$this->auth->isAdmin() && $this->auth->id() != $id) {
-            $this->redirect(BASE_PATH . '/users');
+            $this->redirect('/users');
         }
 
         // ユーザー情報を取得
         $user = $this->model->getById($id);
         if (!$user) {
-            $this->redirect(BASE_PATH . '/users');
+            $this->redirect('/users');
         }
 
         // ユーザーの所属組織を取得
@@ -98,7 +97,7 @@ class UserController extends Controller
         // 主組織のID
         $primaryOrgId = null;
         foreach ($userOrganizations as $org) {
-            if (isset($org['is_primary']) && $org['is_primary']) {
+            if ($org['is_primary']) {
                 $primaryOrgId = $org['id'];
                 break;
             }
@@ -108,12 +107,19 @@ class UserController extends Controller
         $orgModel = new Organization();
         $organizations = $orgModel->getAll();
 
+        // 追加の組織をカンマ区切りの文字列に変換
+        $additionalOrganizations = array_filter($userOrgIds, function ($orgId) use ($primaryOrgId) {
+            return $orgId != $primaryOrgId;
+        });
+        $additionalOrganizationsStr = implode(',', $additionalOrganizations);
+
         $viewData = [
             'title' => 'ユーザー編集',
             'user' => $user,
             'userOrganizations' => $userOrganizations,
             'userOrgIds' => $userOrgIds,
             'primaryOrgId' => $primaryOrgId,
+            'additionalOrganizations' => $additionalOrganizationsStr,
             'organizations' => $organizations,
             'jsFiles' => ['user.js']
         ];

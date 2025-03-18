@@ -30,8 +30,10 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.2/main.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.2/locales/ja.js"></script>
 
-<!-- JSのベースパス定数をPHPから読み込み -->
-<script src="<?= BASE_PATH ?>/js/js_constants.php"></script>
+<!-- JSのベースパス設定 -->
+<script>
+    var BASE_PATH = "<?php echo BASE_PATH; ?>";
+</script>
 
 <!-- アプリケーションJSファイル -->
 <script src="<?= BASE_PATH ?>/js/app.js"></script>

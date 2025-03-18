@@ -121,6 +121,7 @@ class OrganizationController extends Controller
 
         $this->view('organization/view', $viewData);
     }
+    
 
     // API: 全組織を取得
     public function apiGetAll()
@@ -345,4 +346,5 @@ class OrganizationController extends Controller
 
         return ['success' => true, 'data' => ['unique' => $isUnique]];
     }
+    
 }

@@ -223,6 +223,12 @@ $router->apiGet('/organizations/check-code', function ($params) {
     return $controller->apiCheckCodeUnique($params);
 }, true);
 
+// 組織のユーザー一覧を取得
+$router->apiGet('/organizations/:id/users', function ($params) {
+    $controller = new Controllers\OrganizationController();
+    return $controller->apiGetUsers($params);
+}, true);
+
 // ユーザー管理API
 $router->apiGet('/users', function ($params) {
     $controller = new Controllers\UserController();

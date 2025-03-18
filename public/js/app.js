@@ -1,5 +1,5 @@
 /**
- * GroupWare - メインアプリケーションJS
+ * GroupSession PHP - メインアプリケーションJS
  */
 
 // アプリケーション名前空間
@@ -32,14 +32,23 @@ const App = {
 
     // イベントリスナーを設定
     setupEventListeners: function () {
-        // ナビゲーションリンクのクリックイベント
-        $(document).on('click', 'a[data-page]', function (e) {
-            e.preventDefault();
-            const page = $(this).data('page');
-            const url = $(this).attr('href');
+        // 標準のリンククリックをトラップして処理
+        $(document).on('click', 'a:not([data-bs-toggle]):not([target="_blank"])', function (e) {
+            let href = $(this).attr('href');
 
-            // ページ遷移
-            App.navigateTo(url, page);
+            // # だけのリンク、JavaScript:など特殊リンク、外部リンクは除外
+            if (href === '#' || href.indexOf('javascript:') === 0 || href.indexOf('http') === 0) {
+                return true;
+            }
+
+            // BASE_PATHが含まれていないパスにはBASE_PATHを追加
+            if (href.indexOf(BASE_PATH) !== 0 && href.charAt(0) === '/') {
+                href = BASE_PATH + href;
+                $(this).attr('href', href);
+            }
+
+            e.preventDefault();
+            window.location.href = href;
         });
 
         // モーダル内のフォーム送信
@@ -67,7 +76,13 @@ const App = {
         // 削除ボタンのクリック
         $(document).on('click', '.btn-delete', function (e) {
             e.preventDefault();
-            const url = $(this).data('url');
+            let url = $(this).data('url');
+
+            // BASE_PATHがない場合は追加
+            if (url.indexOf(BASE_PATH) !== 0 && url.charAt(0) === '/') {
+                url = BASE_PATH + url;
+            }
+
             const message = $(this).data('confirm') || '本当に削除しますか？';
 
             if (confirm(message)) {
@@ -76,12 +91,18 @@ const App = {
                         if (response.success) {
                             App.showNotification(response.message || '削除しました', 'success');
 
+                            // リダイレクト指定があればリダイレクト
+                            if (response.redirect) {
+                                window.location.href = response.redirect;
+                                return;
+                            }
+
                             // データテーブルがある場合は再読み込み
                             if ($.fn.DataTable.isDataTable('.datatable')) {
                                 $('.datatable').DataTable().ajax.reload();
                             } else {
                                 // 現在のページをリロード
-                                App.reloadCurrentPage();
+                                window.location.reload();
                             }
                         } else {
                             App.showNotification(response.error || 'エラーが発生しました', 'error');
@@ -175,62 +196,13 @@ const App = {
         }
     },
 
-    // ページ遷移
-    navigateTo: function (url, page) {
-        // 履歴に追加
-        history.pushState({ page: page }, null, url);
-
-        // コンテンツを読み込む
-        this.loadPage(url);
-    },
-
-    // ページをロード
-    loadPage: function (url) {
-        $.ajax({
-            url: url,
-            type: 'GET',
-            dataType: 'html',
-            beforeSend: function () {
-                // ローディングインジケータを表示
-                $('#page-loader').show();
-            },
-            success: function (html) {
-                // メインコンテンツを更新
-                const mainContent = $(html).find('#main-content').html();
-                $('#main-content').html(mainContent);
-
-                // ナビゲーションメニューのアクティブ状態を更新
-                const activePage = $(html).find('nav .active').data('page');
-                $('nav .nav-link').removeClass('active');
-                $('nav [data-page="' + activePage + '"]').addClass('active');
-
-                // ページタイトルを更新
-                document.title = $(html).filter('title').text();
-
-                // 現在のページを更新
-                App.currentPage = activePage;
-
-                // ページ固有の初期化
-                App.initCurrentPage();
-            },
-            error: function (xhr, status, error) {
-                App.showNotification('ページの読み込みに失敗しました', 'error');
-                console.error(error);
-            },
-            complete: function () {
-                // ローディングインジケータを非表示
-                $('#page-loader').hide();
-            }
-        });
-    },
-
-    // 現在のページをリロード
-    reloadCurrentPage: function () {
-        this.loadPage(window.location.href);
-    },
-
     // フォーム送信
     submitForm: function (url, method, data, form) {
+        // BASE_PATHがない場合は追加
+        if (url.indexOf(BASE_PATH) !== 0 && url.charAt(0) === '/') {
+            url = BASE_PATH + url;
+        }
+
         $.ajax({
             url: url,
             type: method,
@@ -265,7 +237,7 @@ const App = {
                         $('.datatable').DataTable().ajax.reload();
                     } else {
                         // 現在のページをリロード
-                        App.reloadCurrentPage();
+                        window.location.reload();
                     }
                 } else {
                     // エラーの場合
@@ -373,13 +345,66 @@ const App = {
 
     // API URLを構築
     buildApiUrl: function (endpoint, params = {}) {
-        // エンドポイントが既にBASE_PATHで始まっている場合は追加しない
-        let url = endpoint;
-        if (!endpoint.startsWith(BASE_PATH) && !endpoint.startsWith('/api')) {
-            url = this.config.apiEndpoint + endpoint;
-        } else if (endpoint.startsWith('/api')) {
-            url = BASE_PATH + endpoint;
+        // エンドポイントが既にフルURLの場合はそのまま使用
+        if (endpoint.startsWith('http')) {
+            let url = endpoint;
+
+            // GETパラメータを追加
+            if (Object.keys(params).length > 0) {
+                const queryString = new URLSearchParams(params).toString();
+                url += (url.includes('?') ? '&' : '?') + queryString;
+            }
+
+            return url;
         }
+
+        // BASE_PATHから始まる場合は、そのまま使用
+        if (endpoint.startsWith(BASE_PATH)) {
+            // BASE_PATHの後に/apiがない場合は追加
+            if (!endpoint.includes('/api/') && !endpoint.endsWith('/api')) {
+                endpoint = endpoint.replace(BASE_PATH, BASE_PATH + '/api');
+            }
+
+            let url = endpoint;
+
+            // GETパラメータを追加
+            if (Object.keys(params).length > 0) {
+                const queryString = new URLSearchParams(params).toString();
+                url += (url.includes('?') ? '&' : '?') + queryString;
+            }
+
+            return url;
+        }
+
+        // / で始まる場合
+        if (endpoint.startsWith('/')) {
+            // /api で始まる場合は、BASE_PATHを追加
+            if (endpoint.startsWith('/api/') || endpoint === '/api') {
+                let url = BASE_PATH + endpoint;
+
+                // GETパラメータを追加
+                if (Object.keys(params).length > 0) {
+                    const queryString = new URLSearchParams(params).toString();
+                    url += (url.includes('?') ? '&' : '?') + queryString;
+                }
+
+                return url;
+            }
+
+            // それ以外は/apiを追加
+            let url = BASE_PATH + '/api' + endpoint;
+
+            // GETパラメータを追加
+            if (Object.keys(params).length > 0) {
+                const queryString = new URLSearchParams(params).toString();
+                url += (url.includes('?') ? '&' : '?') + queryString;
+            }
+
+            return url;
+        }
+
+        // 相対パスの場合（/で始まらない）
+        let url = BASE_PATH + '/api/' + endpoint;
 
         // GETパラメータを追加
         if (Object.keys(params).length > 0) {
@@ -515,12 +540,4 @@ const App = {
 // DOMが読み込まれたら初期化
 $(document).ready(function () {
     App.init();
-
-    // ブラウザのバック/フォワードボタンでの履歴操作
-    $(window).on('popstate', function (event) {
-        if (event.originalEvent.state) {
-            const url = location.href;
-            App.loadPage(url);
-        }
-    });
 });

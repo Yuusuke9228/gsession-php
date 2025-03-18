@@ -123,6 +123,52 @@ const User = {
         $(document).on('click', '.remove-organization', function () {
             $(this).closest('.organization-row').remove();
         });
+
+        // 編集時には既に追加組織があるかもしれないので、hidden入力から取得して追加
+        if ($('#id').length > 0) {
+            const additionalOrgs = $('#additional_organizations').val();
+            if (additionalOrgs) {
+                const orgIds = additionalOrgs.split(',');
+                for (const orgId of orgIds) {
+                    if (orgId.trim()) {
+                        // 少し遅延させて、組織選択データが読み込まれた後に実行
+                        setTimeout(() => User.addOrganizationRow(orgId), 1000);
+                    }
+                }
+            }
+        }
+    },
+
+    // 組織選択の初期化
+    initOrganizationSelect: function () {
+        // 組織リストを取得
+        App.apiGet('organizations')
+            .then(response => {
+                if (response.success) {
+                    const organizations = response.data;
+
+                    // 主組織のセレクトボックスを更新
+                    const orgSelect = $('#organization_id');
+                    const selectedOrgId = orgSelect.data('selected');
+
+                    orgSelect.empty();
+                    orgSelect.append('<option value="">選択してください</option>');
+
+                    organizations.forEach(org => {
+                        const selected = (selectedOrgId == org.id) ? 'selected' : '';
+                        orgSelect.append(`<option value="${org.id}" ${selected}>${org.name}</option>`);
+                    });
+
+                    // 追加組織のセレクトボックスも構築
+                    this.buildAdditionalOrgSelect(organizations);
+                } else {
+                    App.showNotification('組織リストの読み込みに失敗しました', 'error');
+                }
+            })
+            .catch(error => {
+                App.showNotification('組織リストの読み込みに失敗しました', 'error');
+                console.error(error);
+            });
     },
 
     // 詳細ページの初期化
@@ -228,42 +274,42 @@ const User = {
     },
 
     // 組織選択の初期化
-    initOrganizationSelect: function () {
-        // 組織リストを取得
-        App.apiGet('/organizations')
-            .then(response => {
-                if (response.success) {
-                    const organizations = response.data;
+    // initOrganizationSelect: function () {
+    //     // 組織リストを取得
+    //     App.apiGet('/organizations')
+    //         .then(response => {
+    //             if (response.success) {
+    //                 const organizations = response.data;
 
-                    // 主組織のセレクトボックスを更新
-                    const orgSelect = $('#organization_id');
-                    orgSelect.empty();
-                    orgSelect.append('<option value="">選択してください</option>');
+    //                 // 主組織のセレクトボックスを更新
+    //                 const orgSelect = $('#organization_id');
+    //                 orgSelect.empty();
+    //                 orgSelect.append('<option value="">選択してください</option>');
 
-                    organizations.forEach(org => {
-                        const selected = (orgSelect.data('selected') == org.id) ? 'selected' : '';
-                        orgSelect.append(`<option value="${org.id}" ${selected}>${org.name}</option>`);
-                    });
+    //                 organizations.forEach(org => {
+    //                     const selected = (orgSelect.data('selected') == org.id) ? 'selected' : '';
+    //                     orgSelect.append(`<option value="${org.id}" ${selected}>${org.name}</option>`);
+    //                 });
 
-                    // 追加組織のセレクトボックスも構築
-                    this.buildAdditionalOrgSelect(organizations);
+    //                 // 追加組織のセレクトボックスも構築
+    //                 this.buildAdditionalOrgSelect(organizations);
 
-                    // 既存の追加組織がある場合（編集時）
-                    if ($('.organization-row').length === 0 && $('#additional_organizations').val()) {
-                        const additionalOrgs = $('#additional_organizations').val().split(',');
-                        additionalOrgs.forEach(orgId => {
-                            this.addOrganizationRow(orgId);
-                        });
-                    }
-                } else {
-                    App.showNotification('組織リストの読み込みに失敗しました', 'error');
-                }
-            })
-            .catch(error => {
-                App.showNotification('組織リストの読み込みに失敗しました', 'error');
-                console.error(error);
-            });
-    },
+    //                 // 既存の追加組織がある場合（編集時）
+    //                 if ($('.organization-row').length === 0 && $('#additional_organizations').val()) {
+    //                     const additionalOrgs = $('#additional_organizations').val().split(',');
+    //                     additionalOrgs.forEach(orgId => {
+    //                         this.addOrganizationRow(orgId);
+    //                     });
+    //                 }
+    //             } else {
+    //                 App.showNotification('組織リストの読み込みに失敗しました', 'error');
+    //             }
+    //         })
+    //         .catch(error => {
+    //             App.showNotification('組織リストの読み込みに失敗しました', 'error');
+    //             console.error(error);
+    //         });
+    // },
 
     // 追加組織のセレクトボックス構築
     buildAdditionalOrgSelect: function (organizations) {
