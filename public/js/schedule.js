@@ -176,6 +176,7 @@ const Schedule = {
     },
 
     // フォームページの初期化
+    // フォームページの初期化
     initForm: function () {
         // 日付時間ピッカーの初期化
         this.initDateTimePickers();
@@ -214,13 +215,6 @@ const Schedule = {
             }
         });
 
-        // 初期表示（繰り返し設定の状態に合わせる）
-        if ($('#repeat_type').val() !== 'none') {
-            $('.repeat-options').show();
-        } else {
-            $('.repeat-options').hide();
-        }
-
         // 公開範囲の変更処理
         $('#visibility').on('change', function () {
             if ($(this).val() === 'specific') {
@@ -230,17 +224,29 @@ const Schedule = {
             }
         });
 
-        // 初期表示（公開範囲の状態に合わせる）
-        if ($('#visibility').val() === 'specific') {
-            $('.visibility-specific').show();
-        } else {
-            $('.visibility-specific').hide();
-        }
+        // 日付の連動（開始日を変更したら終了日も自動更新）
+        $('#start_time_date').on('change', function () {
+            if ($('#end_time_date').val() < $(this).val()) {
+                $('#end_time_date').val($(this).val());
+            }
+        });
+
+        // 時間の連動（開始時間を変更したら終了時間も自動更新 - 同日の場合）
+        $('#start_time_time').on('change', function () {
+            if ($('#start_time_date').val() === $('#end_time_date').val() &&
+                $('#end_time_time').val() <= $(this).val()) {
+                // 開始時間より1時間後を設定
+                let startTime = moment($(this).val(), 'HH:mm');
+                let endTime = moment(startTime).add(1, 'hour');
+                $('#end_time_time').val(endTime.format('HH:mm'));
+            }
+        });
 
         // フォーム送信前のバリデーション
         $('form').on('submit', function (e) {
             if (!Schedule.validateForm()) {
                 e.preventDefault();
+                return false;
             }
 
             // 日付と時間を結合
@@ -251,6 +257,60 @@ const Schedule = {
             const endDate = $('#end_time_date').val();
             const endTime = $('#end_time_time').val();
             $('#end_time').val(endDate + ' ' + endTime);
+
+            return true;
+        });
+    },
+
+    // 日付時間ピッカーの初期化
+    initDateTimePickers: function () {
+        // 日付ピッカーの設定
+        flatpickr('.date-picker', {
+            dateFormat: 'Y-m-d',
+            locale: 'ja',
+            disableMobile: true,
+            onChange: function (selectedDates, dateStr, instance) {
+                // 開始日が変更された場合、終了日も更新（終了日が開始日より前の場合）
+                if (instance.element.id === 'start_time_date') {
+                    const endDatePicker = document.getElementById('end_time_date')._flatpickr;
+                    if (endDatePicker.selectedDates[0] < selectedDates[0]) {
+                        endDatePicker.setDate(dateStr);
+                    }
+                }
+            }
+        });
+
+        // 時間ピッカーの設定
+        flatpickr('.time-picker', {
+            enableTime: true,
+            noCalendar: true,
+            dateFormat: 'H:i',
+            time_24hr: true,
+            minuteIncrement: 15,
+            disableMobile: true,
+            onChange: function (selectedDates, dateStr, instance) {
+                // 開始時間が変更された場合、終了時間も更新（同日かつ終了時間が開始時間より前の場合）
+                if (instance.element.id === 'start_time_time') {
+                    const startDate = document.getElementById('start_time_date').value;
+                    const endDate = document.getElementById('end_time_date').value;
+
+                    if (startDate === endDate) {
+                        const endTimePicker = document.getElementById('end_time_time')._flatpickr;
+                        const endTime = endTimePicker.selectedDates[0];
+                        const startTime = new Date();
+
+                        startTime.setHours(parseInt(dateStr.split(':')[0]));
+                        startTime.setMinutes(parseInt(dateStr.split(':')[1]));
+
+                        if (endTime <= startTime) {
+                            // 開始時間の1時間後を設定
+                            const newEndTime = new Date(startTime);
+                            newEndTime.setHours(newEndTime.getHours() + 1);
+                            endTimePicker.setDate(newEndTime);
+                        }
+                    }
+                }
+            }
         });
     },
 
@@ -337,23 +397,23 @@ const Schedule = {
     },
 
     // 日付時間ピッカーの初期化
-    initDateTimePickers: function () {
-        // flatpickrの初期化
-        flatpickr('.date-picker', {
-            dateFormat: 'Y-m-d',
-            locale: 'ja',
-            disableMobile: true
-        });
+    // initDateTimePickers: function () {
+    //     // flatpickrの初期化
+    //     flatpickr('.date-picker', {
+    //         dateFormat: 'Y-m-d',
+    //         locale: 'ja',
+    //         disableMobile: true
+    //     });
 
-        flatpickr('.time-picker', {
-            enableTime: true,
-            noCalendar: true,
-            dateFormat: 'H:i',
-            time_24hr: true,
-            minuteIncrement: 5,
-            disableMobile: true
-        });
-    },
+    //     flatpickr('.time-picker', {
+    //         enableTime: true,
+    //         noCalendar: true,
+    //         dateFormat: 'H:i',
+    //         time_24hr: true,
+    //         minuteIncrement: 5,
+    //         disableMobile: true
+    //     });
+    // },
 
     // 参加者セレクトの初期化
     initParticipantSelect: function () {

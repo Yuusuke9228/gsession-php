@@ -109,7 +109,7 @@ class Router
     private function matchRoute($route, $method, $path)
     {
         if ($route['method'] !== $method) {
-            return false;
+            return [false, []];
         }
 
         // 完全一致の場合
@@ -139,6 +139,19 @@ class Router
             $path = substr($path, strlen($baseDir));
         }
 
+        // 特別なケース: 組織コードの重複チェックAPI
+        if (strpos($path, '/api/organizations/check-code') !== false && $method === 'GET') {
+            $controller = new \Controllers\OrganizationController();
+
+            // クエリパラメータをそのまま渡す
+            $params = $_GET;
+            $response = $controller->apiCheckCodeUnique($params);
+
+            header('Content-Type: application/json');
+            echo json_encode($response);
+            exit;
+        }
+
         // API用ルートを先にチェック
         foreach ($this->apiRoutes as $route) {
             list($matched, $params) = $this->matchRoute($route, $method, $path);
@@ -156,12 +169,28 @@ class Router
                 $requestData = [];
 
                 if ($method === 'POST' || $method === 'PUT') {
-                    $input = file_get_contents('php://input');
+                    // まず$_POSTを確認
+                    if (!empty($_POST)) {
+                        $requestData = $_POST;
+                    } else {
+                        // $_POSTが空の場合はphp://inputからデータを取得
+                        $input = file_get_contents('php://input');
 
+                        if (!empty($input)) {
+                            $contentType = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : '';
+
+                            if (strpos($contentType, 'application/json') !== false) {
+                                $requestData = json_decode($input, true) ?? [];
+                            } else {
+                                // 他のフォーマット（例：x-www-form-urlencoded）
+                                parse_str($input, $requestData);
+                            }
+                        }
+                    }
+                } else if ($method === 'DELETE') {
+                    $input = file_get_contents('php://input');
                     if (!empty($input)) {
                         $requestData = json_decode($input, true) ?? [];
-                    } else {
-                        $requestData = $_POST;
                     }
                 }
 

@@ -7,7 +7,8 @@ if (!isset($schedule)) $schedule = [];
 if (!isset($isEdit)) $isEdit = false;
 
 // 各フィールドの値取得用ヘルパー関数
-function getValue($field, $default = '') {
+function getValue($field, $default = '')
+{
     global $schedule;
     return isset($schedule[$field]) ? htmlspecialchars($schedule[$field]) : $default;
 }
@@ -44,7 +45,7 @@ if (isset($schedule['end_time']) && !isset($schedule['end_time_date'])) {
 <div class="row mb-3">
     <input type="hidden" id="start_time" name="start_time" value="<?php echo getValue('start_time'); ?>">
     <input type="hidden" id="end_time" name="end_time" value="<?php echo getValue('end_time'); ?>">
-    
+
     <div class="col-md-3">
         <label for="start_time_date" class="form-label">開始日 <span class="text-danger">*</span></label>
         <input type="text" class="form-control date-picker" id="start_time_date" name="start_time_date" value="<?php echo getValue('start_time_date'); ?>" required>
@@ -104,7 +105,7 @@ if (isset($schedule['end_time']) && !isset($schedule['end_time_date'])) {
     </div>
 </div>
 
-<div class="mb-3 visibility-specific" style="display: none;">
+<div class="mb-3 visibility-specific" style="<?php echo getValue('visibility') === 'specific' ? '' : 'display: none;'; ?>">
     <label for="participants" class="form-label">参加者</label>
     <select class="form-select participant-select" id="participants" name="participants[]" multiple>
         <?php if (isset($participants) && is_array($participants)): ?>
@@ -118,7 +119,7 @@ if (isset($schedule['end_time']) && !isset($schedule['end_time_date'])) {
     <small class="form-text text-muted">参加者を選択してください（複数選択可）</small>
 </div>
 
-<div class="mb-3 visibility-specific" style="display: none;">
+<div class="mb-3 visibility-specific" style="<?php echo getValue('visibility') === 'specific' ? '' : 'display: none;'; ?>">
     <label for="organizations" class="form-label">共有組織</label>
     <select class="form-select organization-select" id="organizations" name="organizations[]" multiple>
         <?php if (isset($sharedOrganizations) && is_array($sharedOrganizations)): ?>
@@ -143,7 +144,7 @@ if (isset($schedule['end_time']) && !isset($schedule['end_time_date'])) {
     </select>
 </div>
 
-<div class="mb-3 repeat-options" style="display: none;">
+<div class="mb-3 repeat-options" style="<?php echo getValue('repeat_type') !== 'none' ? '' : 'display: none;'; ?>">
     <label for="repeat_end_date" class="form-label">繰り返し終了日</label>
     <input type="text" class="form-control date-picker" id="repeat_end_date" name="repeat_end_date" value="<?php echo getValue('repeat_end_date'); ?>">
     <div class="invalid-feedback"></div>

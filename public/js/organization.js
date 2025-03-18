@@ -355,20 +355,35 @@ const Organization = {
 
     // コードの重複チェック
     checkCodeUnique: function (code, id = null) {
-        const url = '/organizations/check-code';
-        const params = { code: code };
+        console.log("Checking code uniqueness:", code, id);
 
+        // パラメータを設定
+        const params = { code: code };
         if (id) {
             params.id = id;
         }
 
-        App.apiGet(url, params)
-            .then(response => {
+        // APIリクエストを直接作成
+        const url = BASE_PATH + '/api/organizations/check-code?' + new URLSearchParams(params).toString();
+        console.log("API URL:", url);
+
+        // 標準のfetchを使用
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Code uniqueness response:", data);
+
                 const codeInput = $('#code').length ? $('#code') :
                     $('#create-organization-modal #code').length ? $('#create-organization-modal #code') :
                         $('#edit-organization-modal #code');
 
-                if (response.success && response.data.unique) {
+                if (data.success && data.data.unique) {
                     // 重複なし
                     codeInput.removeClass('is-invalid').addClass('is-valid');
                     codeInput.next('.invalid-feedback').text('');
@@ -379,7 +394,7 @@ const Organization = {
                 }
             })
             .catch(error => {
-                console.error(error);
+                console.error('Code unique check error:', error);
             });
     },
 

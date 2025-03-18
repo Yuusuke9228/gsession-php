@@ -18,6 +18,12 @@ $schedule = [
     'status' => 'scheduled',
     'repeat_type' => 'none'
 ];
+
+// 初期値を分解
+$schedule['start_time_date'] = $defaultDate;
+$schedule['start_time_time'] = $defaultTime;
+$schedule['end_time_date'] = $defaultDate;
+$schedule['end_time_time'] = date('H:i', strtotime($defaultTime) + 3600);
 ?>
 <div class="container-fluid" data-page-type="create">
     <div class="row mb-4">
@@ -30,12 +36,12 @@ $schedule = [
             </a>
         </div>
     </div>
-    
+
     <div class="card">
         <div class="card-body">
             <form action="<?php echo BASE_PATH; ?>/api/schedule" method="post">
                 <?php include __DIR__ . '/form_fields.php'; ?>
-                
+
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                     <a href="javascript:history.back()" class="btn btn-outline-secondary me-md-2">キャンセル</a>
                     <button type="submit" class="btn btn-primary">作成</button>
@@ -44,4 +50,3 @@ $schedule = [
         </div>
     </div>
 </div>
-

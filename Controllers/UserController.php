@@ -251,6 +251,8 @@ class UserController extends Controller
     // API: ユーザーを作成
     public function apiCreate($params, $data)
     {
+        // デバッグ用：受信データの内容を確認
+        error_log('API Create User - Data received: ' . print_r($data, true));
         // 認証チェック
         if (!$this->auth->check()) {
             return ['error' => 'Unauthorized', 'code' => 401];
