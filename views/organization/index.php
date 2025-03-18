@@ -1,6 +1,6 @@
 <?php
 // views/organization/index.php
-$pageTitle = '組織管理 - GroupSession PHP';
+$pageTitle = '組織管理 - GroupWare';
 ?>
 <div class="container-fluid" data-page-type="index">
     <div class="row mb-4">

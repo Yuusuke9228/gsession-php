@@ -1,5 +1,5 @@
 /**
- * GroupSession PHP - スケジュール管理JS
+ * GroupWare - スケジュール管理JS
  */
 
 const Schedule = {

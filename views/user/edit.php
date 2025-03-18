@@ -1,6 +1,6 @@
 <?php
 // views/user/edit.php
-$pageTitle = 'ユーザー編集 - GroupSession PHP';
+$pageTitle = 'ユーザー編集 - GroupWare';
 $isEdit = true;
 ?>
 <div class="container-fluid" data-page-type="edit">

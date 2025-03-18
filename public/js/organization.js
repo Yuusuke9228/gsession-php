@@ -1,5 +1,5 @@
 /**
- * GroupSession PHP - 組織管理JS
+ * GroupWare - 組織管理JS
  */
 
 const Organization = {

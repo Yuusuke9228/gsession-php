@@ -1,6 +1,6 @@
 <?php
 // views/schedule/view.php
-$pageTitle = 'スケジュール詳細 - GroupSession PHP';
+$pageTitle = 'スケジュール詳細 - GroupWare';
 
 // 現在のユーザー情報
 $currentUser = \Core\Auth::getInstance()->user();

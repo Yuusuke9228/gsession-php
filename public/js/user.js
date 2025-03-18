@@ -1,5 +1,5 @@
 /**
- * GroupSession PHP - ユーザー管理JS
+ * GroupWare - ユーザー管理JS
  */
 
 const User = {

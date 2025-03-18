@@ -1,5 +1,5 @@
 /**
- * GroupSession PHP - メインアプリケーションJS
+ * GroupWare - メインアプリケーションJS
  */
 
 // アプリケーション名前空間
@@ -99,7 +99,6 @@ const App = {
     initCurrentPage: function () {
         // URLから現在のページを判断
         const path = window.location.pathname;
-        const basePath = BASE_PATH.endsWith('/') ? BASE_PATH.slice(0, -1) : BASE_PATH;
 
         if (path.includes('/organizations')) {
             this.currentPage = 'organizations';

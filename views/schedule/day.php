@@ -1,6 +1,6 @@
 <?php
 // views/schedule/day.php
-$pageTitle = 'スケジュール（日表示） - GroupSession PHP';
+$pageTitle = 'スケジュール（日表示） - GroupWare';
 
 // 日付フォーマット
 $formattedDate = date('Y年n月j日', strtotime($date));

@@ -1,6 +1,6 @@
 <?php
 // views/user/index.php
-$pageTitle = 'ユーザー管理 - GroupSession PHP';
+$pageTitle = 'ユーザー管理 - GroupWare';
 ?>
 <div class="container-fluid" data-page-type="index">
     <div class="row mb-4">

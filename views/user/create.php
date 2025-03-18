@@ -1,6 +1,6 @@
 <?php
 // views/user/create.php
-$pageTitle = '新規ユーザー作成 - GroupSession PHP';
+$pageTitle = '新規ユーザー作成 - GroupWare';
 $isEdit = false;
 ?>
 <div class="container-fluid" data-page-type="create">

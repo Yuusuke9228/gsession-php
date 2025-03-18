@@ -2,7 +2,7 @@
 // config/config.php
 return [
     'app' => [
-        'name' => 'GroupSession PHP',
+        'name' => 'GroupWare Sample',
         'version' => '1.0.0',
         'timezone' => 'Asia/Tokyo',
         'debug' => true,

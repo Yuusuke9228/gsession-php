@@ -1,6 +1,6 @@
 <?php
 // views/user/view.php
-$pageTitle = 'ユーザー詳細 - GroupSession PHP';
+$pageTitle = 'ユーザー詳細 - GroupWare';
 ?>
 <div class="container-fluid" data-page-type="view">
     <div class="row mb-4">

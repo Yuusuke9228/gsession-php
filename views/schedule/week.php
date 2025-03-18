@@ -1,6 +1,6 @@
 <?php
 // views/schedule/week.php
-$pageTitle = 'スケジュール（週表示） - GroupSession PHP';
+$pageTitle = 'スケジュール（週表示） - GroupWare';
 
 // 週の開始日と終了日を計算
 $startOfWeek = reset($weekDates);
