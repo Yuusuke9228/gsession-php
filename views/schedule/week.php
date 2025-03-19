@@ -21,10 +21,12 @@ if ($startDate->format('Y-m') === $endDate->format('Y-m')) {
     $formattedWeek .= $endDate->format('Y年n月j日');
 }
 ?>
+<?php include __DIR__ . '/modal.php'; ?>
 <div class="container-fluid" data-page-type="week">
     <input type="hidden" id="current-date" value="<?php echo $date; ?>">
     <input type="hidden" id="user-id" value="<?php echo $userId; ?>">
-    
+    <input type="hidden" id="current-user-id" value="<?php echo $this->auth->id(); ?>">
+
     <div class="row mb-4 align-items-center">
         <div class="col">
             <h1 class="h3"><?php echo $formattedWeek; ?> - スケジュール管理</h1>
@@ -61,7 +63,7 @@ if ($startDate->format('Y-m') === $endDate->format('Y-m')) {
             </button>
         </div>
     </div>
-    
+
     <div class="row mb-3">
         <div class="col-md-4">
             <label for="user-selector" class="visually-hidden">ユーザー選択</label>
@@ -80,9 +82,9 @@ if ($startDate->format('Y-m') === $endDate->format('Y-m')) {
             </select>
         </div>
     </div>
-    
+
     <div class="card">
-        <div class="card-body p-0">
+        <div class="card-body schedule-container">
             <div id="week-schedule-container">
                 <!-- スケジュールはJSで動的に生成 -->
                 <div class="text-center p-5">
@@ -96,113 +98,131 @@ if ($startDate->format('Y-m') === $endDate->format('Y-m')) {
 </div>
 
 <style>
-/* 週表示用スタイル */
-.week-schedule {
-    width: 100%;
-    overflow-x: auto;
-}
+    /* カードボディのスクロール設定 */
+    .card-body.schedule-container {
+        padding: 0;
+        overflow: auto;
+        max-height: calc(100vh - 200px);
+        position: relative;
+    }
 
-.week-header {
-    display: flex;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
+    /* 週表示用スタイル */
+    .week-schedule {
+        width: 100%;
+        min-width: 800px;
+        position: relative;
+    }
 
-.week-time-column {
-    width: 60px;
-    min-width: 60px;
-    padding: 8px;
-    text-align: right;
-    font-weight: bold;
-    color: #6c757d;
-    border-right: 1px solid #dee2e6;
-}
+    .week-header {
+        display: flex;
+        background-color: #cfdfef;
+        border-bottom: 1px solid #dee2e6;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
 
-.week-day {
-    flex: 1;
-    min-width: 120px;
-    padding: 8px;
-    text-align: center;
-    border-right: 1px solid #dee2e6;
-}
+    .week-time-column {
+        width: 60px;
+        min-width: 60px;
+        padding: 8px;
+        text-align: right;
+        font-weight: bold;
+        color: #6c757d;
+        border-right: 1px solid #dee2e6;
+        position: sticky;
+        left: 0;
+        background-color: #f8f9fa;
+        z-index: 50;
+    }
 
-.week-day.today {
-    background-color: #fff3cd;
-}
+    .week-header .week-time-column {
+        z-index: 150;
+        background-color: #cfdfef;
+    }
 
-.week-day-name {
-    font-weight: bold;
-}
+    .week-day {
+        flex: 1;
+        min-width: 120px;
+        padding: 8px;
+        text-align: center;
+        border-right: 1px solid #dee2e6;
+    }
 
-.week-day-number {
-    font-size: 1.2rem;
-    font-weight: bold;
-}
+    .week-day.today {
+        background-color: #fff3cd;
+    }
 
-.week-all-day-row {
-    display: flex;
-    min-height: 60px;
-    border-bottom: 1px solid #dee2e6;
-}
+    .week-day-name {
+        font-weight: bold;
+    }
 
-.week-hour-row {
-    display: flex;
-    min-height: 60px;
-    border-bottom: 1px solid #dee2e6;
-}
+    .week-day-number {
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
 
-.week-day-content {
-    flex: 1;
-    min-width: 120px;
-    padding: 5px;
-    border-right: 1px solid #dee2e6;
-    min-height: 60px;
-}
+    .week-all-day-row {
+        display: flex;
+        min-height: 60px;
+        border-bottom: 1px solid #dee2e6;
+    }
 
-.week-day-content.today {
-    background-color: #fff3cd;
-}
+    .week-hour-row {
+        display: flex;
+        min-height: 60px;
+        border-bottom: 1px solid #dee2e6;
+    }
 
-.schedule-item {
-    margin-bottom: 5px;
-    padding: 5px;
-    border-radius: 3px;
-    font-size: 0.8rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-}
+    .week-day-content {
+        flex: 1;
+        min-width: 120px;
+        padding: 5px;
+        border-right: 1px solid #dee2e6;
+        min-height: 60px;
+    }
 
-.schedule-item a {
-    text-decoration: none;
-    color: inherit;
-    display: block;
-}
+    .week-day-content.today {
+        background-color: #fff3cd;
+    }
 
-.schedule-item .schedule-title {
-    font-weight: bold;
-}
+    .schedule-item {
+        margin-bottom: 5px;
+        padding: 5px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+    }
 
-.schedule-item.all-day {
-    border-left: 3px solid #007bff;
-}
+    .schedule-item a {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
 
-.priority-high {
-    background-color: #f8d7da;
-    border-left: 3px solid #dc3545;
-}
+    .schedule-item .schedule-title {
+        font-weight: bold;
+    }
 
-.priority-normal {
-    background-color: #d1e7dd;
-    border-left: 3px solid #198754;
-}
+    .schedule-item.all-day {
+        border-left: 3px solid #007bff;
+    }
 
-.priority-low {
-    background-color: #cfe2ff;
-    border-left: 3px solid #0d6efd;
-}
+    .priority-high {
+        background-color: #f8d7da;
+        border-left: 3px solid #dc3545;
+    }
+
+    .priority-normal {
+        background-color: #d1e7dd;
+        border-left: 3px solid #198754;
+    }
+
+    .priority-low {
+        background-color: #cfe2ff;
+        border-left: 3px solid #0d6efd;
+    }
 </style>

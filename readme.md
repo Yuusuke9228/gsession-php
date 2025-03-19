@@ -26,8 +26,10 @@ cd gsession-php
 ### 2. データベース設定
 
 ```bash
-cp config/database.example.php config/database.php
+cp config/database_sample.php config/database.php
+cp config/config_sample.php config/config.php
 nano config/database.php # 必要に応じて設定を編集
+nano config/config.php # 必要に応じて設定を編集
 ```
 
 ### 3. データベースのセットアップ

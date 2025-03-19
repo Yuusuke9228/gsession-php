@@ -3,8 +3,8 @@
 return [
     'host' => 'localhost',
     'dbname' => 'g_session',
-    'username' => 'erphalcon',
-    'password' => 'erphalcon',
+    'username' => 'root',
+    'password' => '',
     'charset' => 'utf8mb4_general_ci',
     'port' => 3306
 ];

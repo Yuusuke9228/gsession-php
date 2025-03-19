@@ -278,6 +278,7 @@ $router->apiGet('/schedule/day', function ($params) {
 
 $router->apiGet('/schedule/week', function ($params) {
     $controller = new Controllers\ScheduleController();
+    error_log(json_encode(['debug:apigetweek:' => $params]));
     return $controller->apiGetWeek($params);
 }, true);
 

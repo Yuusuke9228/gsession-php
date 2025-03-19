@@ -16,58 +16,34 @@ class Schedule
     // 特定の期間のスケジュールを取得
     public function getByDateRange($startDate, $endDate, $userId = null, $organizationId = null)
     {
-        $params = [$startDate, $endDate];
+        error_log("getByDateRange: startDate=$startDate, endDate=$endDate, userId=$userId");
 
-        $sql = "SELECT s.*, 
-                    u.display_name as creator_name, 
-                    COUNT(sp.user_id) as participant_count 
-                FROM schedules s 
-                LEFT JOIN users u ON s.creator_id = u.id 
-                LEFT JOIN schedule_participants sp ON s.id = sp.schedule_id ";
+        // シンプルなクエリに変更
+        $sql = "SELECT s.*, u.display_name as creator_name 
+            FROM schedules s 
+            LEFT JOIN users u ON s.creator_id = u.id 
+            WHERE s.start_time <= ? AND s.end_time >= ?";
 
-        $whereClauses = [];
-        $whereClauses[] = "(s.start_time <= ? AND s.end_time >= ?)";
-        $params[] = $endDate;
-        $params[] = $startDate;
+        $params = [$endDate, $startDate];
 
-        // 特定のユーザー向けのフィルタリング
+        // 特定ユーザーに関連するスケジュールのみ表示する場合
         if ($userId) {
-            $sql .= "LEFT JOIN schedule_participants sp2 ON s.id = sp2.schedule_id AND sp2.user_id = ? ";
+            // ユーザーIDがある場合、公開か、ユーザーが作成したか、参加者である場合に表示
+            $sql .= " AND (s.visibility = 'public' OR s.creator_id = ? OR 
+                s.id IN (SELECT schedule_id FROM schedule_participants WHERE user_id = ?))";
             $params[] = $userId;
-
-            $whereClauses[] = "(s.creator_id = ? OR sp2.user_id IS NOT NULL OR s.visibility = 'public'";
             $params[] = $userId;
-
-            // 組織共有されたスケジュール
-            if ($organizationId) {
-                $whereClauses[count($whereClauses) - 1] .= " OR s.id IN (
-                    SELECT schedule_id FROM schedule_organizations 
-                    WHERE organization_id IN (
-                        SELECT organization_id FROM user_organizations 
-                        WHERE user_id = ?
-                    )
-                )";
-                $params[] = $userId;
-            }
-
-            $whereClauses[count($whereClauses) - 1] .= ")";
-        }
-        // 特定の組織向けのフィルタリング
-        else if ($organizationId) {
-            $whereClauses[] = "(s.id IN (
-                SELECT schedule_id FROM schedule_organizations 
-                WHERE organization_id = ?
-            ) OR s.visibility = 'public')";
-            $params[] = $organizationId;
         }
 
-        if (!empty($whereClauses)) {
-            $sql .= "WHERE " . implode(" AND ", $whereClauses) . " ";
-        }
+        $sql .= " ORDER BY s.start_time";
 
-        $sql .= "GROUP BY s.id ORDER BY s.start_time";
+        error_log("Simplified query: $sql");
+        error_log("Params: " . json_encode($params));
 
-        return $this->db->fetchAll($sql, $params);
+        $results = $this->db->fetchAll($sql, $params);
+        error_log("Results count: " . count($results));
+
+        return $results;
     }
 
     // 特定のスケジュールを取得
@@ -129,17 +105,35 @@ class Schedule
     // スケジュールを作成
     public function create($data)
     {
+        // デバッグログ
+        error_log("Schedule create called with data: " . json_encode($data));
+
         // 必須項目チェック
         if (
             empty($data['title']) || empty($data['start_time']) ||
             empty($data['end_time']) || empty($data['creator_id'])
         ) {
+            error_log("Schedule create failed: missing required fields");
             return false;
         }
 
         // 開始時間と終了時間の整合性チェック
         if (strtotime($data['start_time']) > strtotime($data['end_time'])) {
+            error_log("Schedule create failed: start_time > end_time");
             return false;
+        }
+
+        // 空の文字列を持つデータフィールドをnullに変換
+        if (isset($data['repeat_end_date']) && $data['repeat_end_date'] === '') {
+            $data['repeat_end_date'] = null;
+        }
+
+        if (isset($data['description']) && $data['description'] === '') {
+            $data['description'] = null;
+        }
+
+        if (isset($data['location']) && $data['location'] === '') {
+            $data['location'] = null;
         }
 
         // トランザクション開始
@@ -148,21 +142,22 @@ class Schedule
         try {
             // スケジュール情報を挿入
             $sql = "INSERT INTO schedules (
-                        title, 
-                        description, 
-                        start_time, 
-                        end_time, 
-                        all_day, 
-                        location, 
-                        creator_id, 
-                        visibility, 
-                        priority, 
-                        status, 
-                        repeat_type, 
-                        repeat_end_date
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    title, 
+                    description, 
+                    start_time, 
+                    end_time, 
+                    all_day, 
+                    location, 
+                    creator_id, 
+                    visibility, 
+                    priority, 
+                    status, 
+                    repeat_type, 
+                    repeat_end_date,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
 
-            $this->db->execute($sql, [
+            $result = $this->db->execute($sql, [
                 $data['title'],
                 $data['description'] ?? null,
                 $data['start_time'],
@@ -174,22 +169,42 @@ class Schedule
                 $data['priority'] ?? 'normal',
                 $data['status'] ?? 'scheduled',
                 $data['repeat_type'] ?? 'none',
-                $data['repeat_end_date'] ?? null
+                $data['repeat_end_date'] ?? null // 空文字列の場合はnullが渡される
             ]);
 
+            if (!$result) {
+                error_log("Failed to execute insert query");
+                throw new \Exception("Insert query failed");
+            }
+
             $scheduleId = $this->db->lastInsertId();
+
+            if (!$scheduleId) {
+                error_log("Failed to get last insert ID");
+                throw new \Exception("Failed to get schedule ID");
+            }
+
+            error_log("Created schedule with ID: " . $scheduleId);
 
             // 参加者を追加
             if (!empty($data['participants']) && is_array($data['participants'])) {
                 foreach ($data['participants'] as $participant) {
-                    $this->addParticipant($scheduleId, $participant);
+                    error_log("Adding participant: " . $participant);
+                    $participantResult = $this->addParticipant($scheduleId, $participant);
+                    if (!$participantResult) {
+                        error_log("Failed to add participant: " . $participant);
+                    }
                 }
             }
 
             // 共有組織を追加
             if (!empty($data['organizations']) && is_array($data['organizations'])) {
                 foreach ($data['organizations'] as $orgId) {
-                    $this->addOrganization($scheduleId, $orgId);
+                    error_log("Adding organization: " . $orgId);
+                    $orgResult = $this->addSharedOrganization($scheduleId, $orgId);
+                    if (!$orgResult) {
+                        error_log("Failed to add organization: " . $orgId);
+                    }
                 }
             }
 
@@ -202,6 +217,7 @@ class Schedule
             return $scheduleId;
         } catch (\Exception $e) {
             $this->db->rollBack();
+            error_log("Exception in schedule creation: " . $e->getMessage());
             return false;
         }
     }
@@ -303,6 +319,10 @@ class Schedule
             strtotime($data['start_time']) > strtotime($data['end_time'])
         ) {
             return false;
+        }
+        // 空の文字列を持つデータフィールドをnullに変換
+        if (isset($data['repeat_end_date']) && $data['repeat_end_date'] === '') {
+            $data['repeat_end_date'] = null;
         }
 
         // 更新フィールドと値の準備
@@ -414,14 +434,31 @@ class Schedule
     // 参加者を追加
     public function addParticipant($scheduleId, $userId, $status = 'pending')
     {
-        $sql = "INSERT INTO schedule_participants (
+        // パラメータをサニタイズ
+        $scheduleId = (int)$scheduleId;
+        $userId = (int)$userId;
+
+        if (!$scheduleId || !$userId) {
+            error_log("Invalid ID for addParticipant: scheduleId=$scheduleId, userId=$userId");
+            return false;
+        }
+
+        try {
+            $sql = "INSERT INTO schedule_participants (
                     schedule_id, 
                     user_id, 
-                    status
-                ) VALUES (?, ?, ?)
-                ON DUPLICATE KEY UPDATE status = ?";
+                    status,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE status = ?, updated_at = NOW()";
 
-        return $this->db->execute($sql, [$scheduleId, $userId, $status, $status]);
+            error_log("Executing addParticipant: $scheduleId, $userId, $status");
+            return $this->db->execute($sql, [$scheduleId, $userId, $status, $status]);
+        } catch (\Exception $e) {
+            error_log("Error in addParticipant: " . $e->getMessage());
+            return false;
+        }
     }
 
     // 参加者のステータスを更新

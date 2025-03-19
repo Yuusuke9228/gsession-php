@@ -14,6 +14,7 @@ const Schedule = {
 
     // 初期化
     init: function () {
+        console.log("Schedule.init called");
         const page = $('[data-page-type]').data('page-type');
 
         // 現在のユーザーIDを取得
@@ -22,12 +23,15 @@ const Schedule = {
         // ページタイプに応じた初期化
         switch (page) {
             case 'day':
+                this.currentView = 'day';
                 this.initDay();
                 break;
             case 'week':
+                this.currentView = 'week';
                 this.initWeek();
                 break;
             case 'month':
+                this.currentView = 'month';
                 this.initMonth();
                 break;
             case 'create':
@@ -50,10 +54,31 @@ const Schedule = {
 
     // 共通のイベントハンドラを設定
     initCommonHandlers: function () {
+        window.addEventListener('popstate', function (event) {
+            if (event.state) {
+                if (event.state.page === 'month' && event.state.year && event.state.month) {
+                    $('#current-year').val(event.state.year);
+                    $('#current-month').val(event.state.month);
+                    Schedule.loadMonthSchedules(event.state.year, event.state.month, $('#user-id').val());
+                } else if (event.state.page === 'week' && event.state.date) {
+                    $('#current-date').val(event.state.date);
+                    Schedule.loadWeekSchedules(event.state.date, $('#user-id').val());
+                } else if (event.state.page === 'day' && event.state.date) {
+                    $('#current-date').val(event.state.date);
+                    Schedule.loadDaySchedules(event.state.date, $('#user-id').val());
+                }
+            }
+        });
         // 新規作成ボタンのイベントハンドラ
         $('#btn-create-schedule').on('click', function () {
             const date = $(this).data('date') || moment().format('YYYY-MM-DD');
-            window.location.href = BASE_PATH + '/schedule/create?date=' + date;
+            if ($('#schedule-modal').length) {
+                // モーダルがある場合はモーダルで表示
+                Schedule.showCreateModal(date, '09:00', false);
+            } else {
+                // モーダルがない場合は従来の遷移
+                window.location.href = BASE_PATH + '/schedule/create?date=' + date;
+            }
         });
 
         // 表示切替ボタン
@@ -90,92 +115,743 @@ const Schedule = {
 
     // 日表示の初期化
     initDay: function () {
-        const date = $('#current-date').val();
+        const initialDate = $('#current-date').val();
         const userId = $('#user-id').val();
 
         // スケジュールデータを取得
-        this.loadDaySchedules(date, userId);
+        this.loadDaySchedules(initialDate, userId);
 
         // 前日・翌日ボタン
-        $('.btn-prev-day').on('click', function () {
-            const prevDate = moment(date, 'YYYY-MM-DD').subtract(1, 'days').format('YYYY-MM-DD');
-            window.location.href = BASE_PATH + '/schedule/day?date=' + prevDate + '&user_id=' + userId;
+        $('.btn-prev-day').off('click').on('click', function () {
+            // 現在の値を取得（クリックの都度最新の値を使用）
+            const currentDate = $('#current-date').val();
+            const userId = $('#user-id').val();
+
+            const prevDate = moment(currentDate, 'YYYY-MM-DD').subtract(1, 'days').format('YYYY-MM-DD');
+            // const prevDate = moment(date, 'YYYY-MM-DD').subtract(1, 'days').format('YYYY-MM-DD');
+
+            // URLパラメータ更新
+            const newUrl = BASE_PATH + '/schedule/day?date=' + prevDate + '&user_id=' + userId;
+
+            // ページをリロードせずに内容を更新
+            $('#current-date').val(prevDate);
+            Schedule.loadDaySchedules(prevDate, userId);
+
+            // URLを変更（履歴に追加）
+            window.history.pushState({}, '', newUrl);
+
+            // タイトル更新
+            const formattedDate = moment(prevDate).format('YYYY年M月D日');
+            const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][moment(prevDate).day()];
+            $('h1.h3').text(`${formattedDate} (${dayOfWeek}) - スケジュール管理`);
         });
 
-        $('.btn-next-day').on('click', function () {
-            const nextDate = moment(date, 'YYYY-MM-DD').add(1, 'days').format('YYYY-MM-DD');
-            window.location.href = BASE_PATH + '/schedule/day?date=' + nextDate + '&user_id=' + userId;
+        $('.btn-next-day').off('click').on('click', function () {
+            // 現在の値を取得（クリックの都度最新の値を使用）
+            const currentDate = $('#current-date').val();
+            const userId = $('#user-id').val();
+
+            const nextDate = moment(currentDate, 'YYYY-MM-DD').add(1, 'days').format('YYYY-MM-DD');
+            // const nextDate = moment(date, 'YYYY-MM-DD').add(1, 'days').format('YYYY-MM-DD');
+
+            // URLパラメータ更新
+            const newUrl = BASE_PATH + '/schedule/day?date=' + nextDate + '&user_id=' + userId;
+
+            // ページをリロードせずに内容を更新
+            $('#current-date').val(nextDate);
+            Schedule.loadDaySchedules(nextDate, userId);
+
+            // URLを変更（履歴に追加）
+            window.history.pushState({}, '', newUrl);
+
+            // タイトル更新
+            const formattedDate = moment(nextDate).format('YYYY年M月D日');
+            const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][moment(nextDate).day()];
+            $('h1.h3').text(`${formattedDate} (${dayOfWeek}) - スケジュール管理`);
         });
 
         // 今日ボタン
         $('.btn-today').on('click', function () {
             const today = moment().format('YYYY-MM-DD');
-            window.location.href = BASE_PATH + '/schedule/day?date=' + today + '&user_id=' + userId;
+
+            // URLパラメータ更新
+            const newUrl = BASE_PATH + '/schedule/day?date=' + today + '&user_id=' + userId;
+
+            // ページをリロードせずに内容を更新
+            $('#current-date').val(today);
+            Schedule.loadDaySchedules(today, userId);
+
+            // URLを変更（履歴に追加）
+            window.history.pushState({}, '', newUrl);
+
+            // タイトル更新
+            const formattedDate = moment(today).format('YYYY年M月D日');
+            const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][moment(today).day()];
+            $('h1.h3').text(`${formattedDate} (${dayOfWeek}) - スケジュール管理`);
         });
+
+        // モーダル初期化
+        this.initScheduleModal();
     },
 
     // 週表示の初期化
     initWeek: function () {
-        const date = $('#current-date').val();
+        const initialDate = $('#current-date').val();
         const userId = $('#user-id').val();
 
         // スケジュールデータを取得
-        this.loadWeekSchedules(date, userId);
+        this.loadWeekSchedules(initialDate, userId);
 
         // 前週・翌週ボタン
         $('.btn-prev-week').on('click', function () {
-            const prevWeek = moment(date, 'YYYY-MM-DD').subtract(7, 'days').format('YYYY-MM-DD');
-            window.location.href = BASE_PATH + '/schedule/week?date=' + prevWeek + '&user_id=' + userId;
+            // 現在の値を取得（クリックの都度最新の値を使用）
+            const currentDate = $('#current-date').val();
+            const userId = $('#user-id').val();
+
+            const prevWeek = moment(currentDate, 'YYYY-MM-DD').subtract(7, 'days').format('YYYY-MM-DD');
+
+            // const prevWeek = moment(date, 'YYYY-MM-DD').subtract(7, 'days').format('YYYY-MM-DD');
+
+            // URLパラメータ更新
+            const newUrl = BASE_PATH + '/schedule/week?date=' + prevWeek + '&user_id=' + userId;
+
+            // ページをリロードせずに内容を更新
+            $('#current-date').val(prevWeek);
+            Schedule.loadWeekSchedules(prevWeek, userId);
+
+            // URLを変更（履歴に追加）
+            window.history.pushState({}, '', newUrl);
+
+            // タイトル更新 - 週の開始日と終了日を計算
+            const weekStart = moment(prevWeek).startOf('week').add(1, 'days'); // 月曜開始
+            const weekEnd = moment(weekStart).add(6, 'days');
+            const formattedWeek = weekStart.format('YYYY年M月D日') + '～' + weekEnd.format('M月D日');
+            $('h1.h3').text(`${formattedWeek} - スケジュール管理`);
         });
 
-        $('.btn-next-week').on('click', function () {
-            const nextWeek = moment(date, 'YYYY-MM-DD').add(7, 'days').format('YYYY-MM-DD');
-            window.location.href = BASE_PATH + '/schedule/week?date=' + nextWeek + '&user_id=' + userId;
+        $('.btn-next-week').off('click').on('click', function () {
+            // 現在の値を取得（クリックの都度最新の値を使用）
+            const currentDate = $('#current-date').val();
+            const userId = $('#user-id').val();
+
+            const nextWeek = moment(currentDate, 'YYYY-MM-DD').add(7, 'days').format('YYYY-MM-DD');
+            // const nextWeek = moment(date, 'YYYY-MM-DD').add(7, 'days').format('YYYY-MM-DD');
+
+            // URLパラメータ更新
+            const newUrl = BASE_PATH + '/schedule/week?date=' + nextWeek + '&user_id=' + userId;
+
+            // ページをリロードせずに内容を更新
+            $('#current-date').val(nextWeek);
+            Schedule.loadWeekSchedules(nextWeek, userId);
+
+            // URLを変更（履歴に追加）
+            window.history.pushState({}, '', newUrl);
+
+            // タイトル更新 - 週の開始日と終了日を計算
+            const weekStart = moment(nextWeek).startOf('week').add(1, 'days'); // 月曜開始
+            const weekEnd = moment(weekStart).add(6, 'days');
+            const formattedWeek = weekStart.format('YYYY年M月D日') + '～' + weekEnd.format('M月D日');
+            $('h1.h3').text(`${formattedWeek} - スケジュール管理`);
         });
 
         // 今週ボタン
         $('.btn-this-week').on('click', function () {
             const today = moment().format('YYYY-MM-DD');
-            window.location.href = BASE_PATH + '/schedule/week?date=' + today + '&user_id=' + userId;
+
+            // URLパラメータ更新
+            const newUrl = BASE_PATH + '/schedule/week?date=' + today + '&user_id=' + userId;
+
+            // ページをリロードせずに内容を更新
+            $('#current-date').val(today);
+            Schedule.loadWeekSchedules(today, userId);
+
+            // URLを変更（履歴に追加）
+            window.history.pushState({}, '', newUrl);
+
+            // タイトル更新 - 週の開始日と終了日を計算
+            const weekStart = moment(today).startOf('week').add(1, 'days'); // 月曜開始
+            const weekEnd = moment(weekStart).add(6, 'days');
+            const formattedWeek = weekStart.format('YYYY年M月D日') + '～' + weekEnd.format('M月D日');
+            $('h1.h3').text(`${formattedWeek} - スケジュール管理`);
         });
+
+        // モーダル初期化
+        this.initScheduleModal();
     },
 
     // 月表示の初期化
     initMonth: function () {
-        const year = $('#current-year').val();
-        const month = $('#current-month').val();
+        // const year = $('#current-year').val();
+        // const month = $('#current-month').val();
+        // const userId = $('#user-id').val();
+        const initialYear = $('#current-year').val();
+        const initialMonth = $('#current-month').val();
         const userId = $('#user-id').val();
 
         // スケジュールデータを取得
-        this.loadMonthSchedules(year, month, userId);
+        this.loadMonthSchedules(initialYear, initialMonth, userId);
 
         // 前月・翌月ボタン
         $('.btn-prev-month').on('click', function () {
-            const prevMonth = moment(`${year}-${month}-01`, 'YYYY-MM-DD').subtract(1, 'months');
-            window.location.href = BASE_PATH + '/schedule/month?year=' + prevMonth.year() + '&month=' + (prevMonth.month() + 1) + '&user_id=' + userId;
+            // 現在の値を取得（クリックの都度最新の値を使用）
+            const currentYear = $('#current-year').val();
+            const currentMonth = $('#current-month').val();
+            const userId = $('#user-id').val();
+
+            // const prevMonth = moment(`${year}-${month}-01`, 'YYYY-MM-DD').subtract(1, 'months');
+            const prevMonth = moment(`${currentYear}-${currentMonth}-01`, 'YYYY-MM-DD').subtract(1, 'months');
+            const newYear = prevMonth.year();
+            const newMonth = prevMonth.month() + 1;
+
+            // URLパラメータ更新
+            const newUrl = BASE_PATH + `/schedule/month?year=${newYear}&month=${newMonth}&user_id=${userId}`;
+
+            // ページをリロードせずに内容を更新
+            $('#current-year').val(newYear);
+            $('#current-month').val(newMonth);
+            Schedule.loadMonthSchedules(newYear, newMonth, userId);
+
+            // URLを変更（履歴に追加）
+            window.history.pushState({}, '', newUrl);
+
+            // タイトル更新
+            const monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+            $('h1.h3').text(`${newYear}年${monthNames[newMonth]} - スケジュール管理`);
         });
 
         $('.btn-next-month').on('click', function () {
-            const nextMonth = moment(`${year}-${month}-01`, 'YYYY-MM-DD').add(1, 'months');
-            window.location.href = BASE_PATH + '/schedule/month?year=' + nextMonth.year() + '&month=' + (nextMonth.month() + 1) + '&user_id=' + userId;
+            // 現在の値を取得（クリックの都度最新の値を使用）
+            const currentYear = $('#current-year').val();
+            const currentMonth = $('#current-month').val();
+            const userId = $('#user-id').val();
+
+            // const nextMonth = moment(`${year}-${month}-01`, 'YYYY-MM-DD').add(1, 'months');
+            const nextMonth = moment(`${currentYear}-${currentMonth}-01`, 'YYYY-MM-DD').add(1, 'months');
+            const newYear = nextMonth.year();
+            const newMonth = nextMonth.month() + 1;
+
+            // URLパラメータ更新
+            const newUrl = BASE_PATH + `/schedule/month?year=${newYear}&month=${newMonth}&user_id=${userId}`;
+
+            // ページをリロードせずに内容を更新
+            $('#current-year').val(newYear);
+            $('#current-month').val(newMonth);
+            Schedule.loadMonthSchedules(newYear, newMonth, userId);
+
+            // URLを変更（履歴に追加）
+            window.history.pushState({}, '', newUrl);
+
+            // タイトル更新
+            const monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+            $('h1.h3').text(`${newYear}年${monthNames[newMonth]} - スケジュール管理`);
         });
 
         // 今月ボタン
         $('.btn-this-month').on('click', function () {
             const today = moment();
-            window.location.href = BASE_PATH + '/schedule/month?year=' + today.year() + '&month=' + (today.month() + 1) + '&user_id=' + userId;
+            const newYear = today.year();
+            const newMonth = today.month() + 1;
+
+            // URLパラメータ更新
+            const newUrl = BASE_PATH + `/schedule/month?year=${newYear}&month=${newMonth}&user_id=${userId}`;
+
+            // ページをリロードせずに内容を更新
+            $('#current-year').val(newYear);
+            $('#current-month').val(newMonth);
+            Schedule.loadMonthSchedules(newYear, newMonth, userId);
+
+            // URLを変更（履歴に追加）
+            window.history.pushState({}, '', newUrl);
+
+            // タイトル更新
+            const monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+            $('h1.h3').text(`${newYear}年${monthNames[newMonth]} - スケジュール管理`);
         });
 
         // 日付セルのクリックイベント
-        $(document).on('click', '.calendar-day', function () {
-            const date = $(this).data('date');
-            if (date) {
-                window.location.href = BASE_PATH + '/schedule/day?date=' + date + '&user_id=' + userId;
+        $(document).on('click', '.calendar-day', function (e) {
+            // スケジュールアイテムのクリックは除外
+            if ($(e.target).closest('.schedule-item, .more-schedules').length === 0) {
+                const date = $(this).data('date');
+                if (date) {
+                    if ($('#schedule-modal').length) {
+                        // モーダルがある場合はモーダルで表示
+                        Schedule.showCreateModal(date, '09:00', true);
+                    } else {
+                        // モーダルがない場合は従来の遷移
+                        window.location.href = BASE_PATH + '/schedule/day?date=' + date + '&user_id=' + userId;
+                    }
+                }
+            }
+        });
+
+        // モーダル初期化
+        this.initScheduleModal();
+    },
+
+    // モーダル表示用の関数を追加
+    initScheduleModal: function () {
+        console.log("Initializing schedule modal");
+
+        // 日付クリックイベント
+        $(document).on('click', '.day-cell, .week-day-content, .schedule-hour', function (e) {
+            // スケジュールアイテムのクリックは除外
+            if ($(e.target).closest('.schedule-item').length === 0) {
+                const date = $(this).data('date');
+                const hour = $(this).data('hour');
+
+                // 日付と時間からデフォルト値を設定
+                let defaultDate = date || moment().format('YYYY-MM-DD');
+                let defaultTime = hour ? hour.toString().padStart(2, '0') + ':00' : '00:00';
+                let allDay = hour === undefined;
+
+                // モーダルを表示
+                Schedule.showCreateModal(defaultDate, defaultTime, allDay);
+            }
+        });
+
+        // スケジュールアイテムクリック
+        $(document).on('click', '.schedule-item', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const scheduleId = $(this).data('id');
+            if (scheduleId) {
+                Schedule.showViewModal(scheduleId);
+            } else {
+                console.error("Schedule item clicked without ID");
+            }
+        });
+
+        // モーダルの各種ボタン処理
+        $('#schedule-modal').on('hidden.bs.modal', function () {
+            $(this).find('form').get(0)?.reset();
+            $(this).find('.is-invalid').removeClass('is-invalid');
+            $(this).find('.invalid-feedback').text('');
+        });
+
+        // フォーム送信イベントハンドラ
+        $('#schedule-form').off('submit').on('submit', function (e) {
+            e.preventDefault();
+
+            // 日付と時間を結合
+            const startDate = $('#start_time_date').val();
+            const startTime = $('#start_time_time').val();
+            $('#start_time').val(startDate + ' ' + startTime);
+
+            const endDate = $('#end_time_date').val();
+            const endTime = $('#end_time_time').val();
+            $('#end_time').val(endDate + ' ' + endTime);
+
+            // フォームデータ取得
+            const formData = $(this).serialize();
+            const url = $(this).attr('action');
+
+            console.log("Submitting form to:", url, "with data:", formData);
+
+            // API送信
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: formData,
+                beforeSend: function () {
+                    $('#schedule-form button[type="submit"]').prop('disabled', true);
+                },
+                success: function (response) {
+                    console.log("Form submission response:", response);
+                    if (response.success) {
+                        App.showNotification(response.message || 'スケジュールを保存しました', 'success');
+                        $('#schedule-modal').modal('hide');
+
+                        // カレンダー再読み込み
+                        Schedule.reloadCurrentView();
+                    } else {
+                        App.showNotification(response.error || 'エラーが発生しました', 'error');
+
+                        // バリデーションエラー表示
+                        if (response.validation) {
+                            for (const field in response.validation) {
+                                const errorMsg = response.validation[field];
+                                const input = $('#' + field);
+                                input.addClass('is-invalid');
+                                input.next('.invalid-feedback').text(errorMsg);
+                            }
+                        }
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.error("Form submission error:", xhr, status, error);
+                    App.showNotification('エラーが発生しました', 'error');
+                },
+                complete: function () {
+                    $('#schedule-form button[type="submit"]').prop('disabled', false);
+                }
+            });
+            return false; // 確実にフォーム送信を防ぐ
+        });
+
+        // 削除ボタンのイベントハンドラ
+        $('.delete-btn').on('click', function () {
+            const scheduleId = $(this).data('id');
+            if (!scheduleId) {
+                console.error("Delete button clicked without schedule ID");
+                return;
+            }
+
+            if (confirm('このスケジュールを削除しますか？')) {
+                console.log("Deleting schedule:", scheduleId);
+                App.apiDelete('/schedule/' + scheduleId)
+                    .then(response => {
+                        console.log("Delete response:", response);
+                        if (response.success) {
+                            App.showNotification(response.message || 'スケジュールを削除しました', 'success');
+                            $('#schedule-modal').modal('hide');
+                            Schedule.reloadCurrentView();
+                        } else {
+                            App.showNotification(response.error || 'エラーが発生しました', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Delete error:", error);
+                        App.showNotification('エラーが発生しました', 'error');
+                    });
+            }
+        });
+
+        // 終日フラグのイベントハンドラ
+        $(document).on('change', '#all_day', function () {
+            if (!$(this).is(':checked')) {
+                $('.time-picker').hide();
+                $('#start_time_time').val('00:00');
+                $('#end_time_time').val('23:59');
+            } else {
+                $('.time-picker').show();
+            }
+        });
+
+        // 公開範囲のイベントハンドラ
+        $(document).on('change', '#visibility', function () {
+            if ($(this).val() === 'specific') {
+                $('.organization-select-container').show();
+            } else {
+                $('.organization-select-container').hide();
+            }
+
+            // 参加者選択は常に表示するため、ここでの処理は不要
+        });
+
+        // 繰り返しタイプのイベントハンドラ
+        $(document).on('change', '#repeat_type', function () {
+            if ($(this).val() !== 'none') {
+                $('.repeat-options').show();
+            } else {
+                $('.repeat-options').hide();
             }
         });
     },
 
-    // フォームページの初期化
+    // 新規作成モーダル表示
+    showCreateModal: function (defaultDate, defaultTime, allDay) {
+        console.log("Showing create modal with date:", defaultDate, "time:", defaultTime);
+
+        // モーダルタイトル設定
+        $('#schedule-modal-title').text('新規スケジュール作成');
+
+        // フォームリセット
+        $('#schedule-form').attr('action', BASE_PATH + '/api/schedule');
+        $('#schedule-form').get(0).reset();
+        $('#schedule-id').val('');
+
+        // デフォルト値設定
+        $('#start_time_date').val(defaultDate);
+        $('#start_time_time').val(defaultTime);
+
+        // 終了時間は開始から1時間後
+        let endTime = moment(defaultTime, 'HH:mm').add(1, 'hour').format('HH:mm');
+        $('#end_time_date').val(defaultDate);
+        $('#end_time_time').val(endTime);
+
+        // 終日フラグ
+        $('#all_day').prop('checked', allDay);
+        if (!allDay) {
+            $('#start_time_time').val('00:00');
+            $('#end_time_time').val('23:59');
+            $('.time-picker').hide();
+        } else {
+            $('.time-picker').show();
+        }
+
+        // 表示/非表示設定
+        $('.delete-btn').hide();
+        $('.edit-mode').show();
+        $('.view-mode').hide();
+
+        // 参加者と共有組織のSelect2をリセット
+        if ($('#participants').data('select2')) {
+            $('#participants').val(null).trigger('change');
+        }
+
+        if ($('#organizations').data('select2')) {
+            $('#organizations').val(null).trigger('change');
+        }
+
+        // 公開範囲による表示/非表示
+        if ($('#visibility').val() === 'specific') {
+            $('.organization-select-container').show();
+        } else {
+            $('.organization-select-container').hide();
+        }
+
+        // モーダル表示
+        $('#schedule-modal').modal('show');
+
+        // モーダル表示後に初期化を実行
+        setTimeout(() => {
+            // 日付ピッカーと時間ピッカーの初期化
+            this.initDateTimePickers();
+
+            // 参加者選択の初期化
+            this.initParticipantSelect();
+        }, 500);
+    },
+
+    // 詳細表示モーダル
+    showViewModal: function (scheduleId) {
+        console.log("Showing view modal for schedule:", scheduleId);
+
+        // スケジュールデータを取得
+        App.apiGet('/schedule/' + scheduleId)
+            .then(response => {
+                console.log("Schedule data:", response);
+                if (response.success) {
+                    const schedule = response.data;
+
+                    // モーダルタイトル設定
+                    $('#schedule-modal-title').text('スケジュール詳細');
+
+                    // 詳細表示モードに
+                    $('.edit-mode').hide();
+                    $('.view-mode').show();
+
+                    // データ表示
+                    $('#view-title').text(schedule.title);
+
+                    // 日時表示処理
+                    const startDateTime = moment(schedule.start_time);
+                    const endDateTime = moment(schedule.end_time);
+                    const isSameDay = startDateTime.isSame(endDateTime, 'day');
+                    const isAllDay = schedule.all_day == 1;
+
+                    let dateTimeText = '';
+                    if (isAllDay) {
+                        if (isSameDay) {
+                            dateTimeText = startDateTime.format('YYYY年M月D日') + ' (終日)';
+                        } else {
+                            dateTimeText = startDateTime.format('YYYY年M月D日') + ' ～ ' +
+                                endDateTime.format('YYYY年M月D日') + ' (終日)';
+                        }
+                    } else {
+                        if (isSameDay) {
+                            dateTimeText = startDateTime.format('YYYY年M月D日 HH:mm') + ' ～ ' +
+                                endDateTime.format('HH:mm');
+                        } else {
+                            dateTimeText = startDateTime.format('YYYY年M月D日 HH:mm') + ' ～ ' +
+                                endDateTime.format('YYYY年M月D日 HH:mm');
+                        }
+                    }
+                    $('#view-datetime').text(dateTimeText);
+
+                    // その他の情報表示
+                    $('#view-location').text(schedule.location || '');
+                    $('#view-description').text(schedule.description || '');
+                    $('#view-creator').text(schedule.creator_name || '');
+
+                    // 参加者リスト
+                    if (schedule.participants && schedule.participants.length > 0) {
+                        let participantsList = '';
+                        schedule.participants.forEach(p => {
+                            const statusBadge = this.getParticipationStatusBadge(p.participation_status);
+                            participantsList += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                                ${p.display_name} ${statusBadge}
+                            </li>`;
+                        });
+                        $('#view-participants').html(participantsList);
+                        $('.participants-section').show();
+                    } else {
+                        $('.participants-section').hide();
+                    }
+
+                    // 編集・削除ボタン表示制御
+                    const currentUserId = $('#current-user-id').val();
+                    console.log('currentUserId:' + currentUserId);
+                    console.log('schedule.creator_id:' + schedule.creator_id);
+                    if (schedule.creator_id == currentUserId || $('.is-admin').length > 0) {
+                        $('.delete-btn').show();
+                        $('#edit-schedule-btn').show();
+                        // 編集ボタンのクリックイベント
+                        $('#edit-schedule-btn').off('click').on('click', function () {
+                            Schedule.showEditModal(schedule);
+                        });
+                        // 削除ボタンの設定
+                        $('.delete-btn').data('id', schedule.id);
+                    } else {
+                        $('.delete-btn').hide();
+                        $('#edit-schedule-btn').hide();
+                    }
+
+                    // モーダル表示
+                    $('#schedule-modal').modal('show');
+                } else {
+                    App.showNotification('スケジュールの読み込みに失敗しました', 'error');
+                }
+            })
+            .catch(error => {
+                console.error("Error loading schedule:", error);
+                App.showNotification('スケジュールの読み込みに失敗しました', 'error');
+            });
+    },
+
+    // 編集モーダル表示
+    showEditModal: function (schedule) {
+        console.log("Showing edit modal for schedule:", schedule);
+
+        // モーダルタイトル設定
+        $('#schedule-modal-title').text('スケジュール編集');
+
+        // フォーム設定
+        $('#schedule-form').attr('action', BASE_PATH + '/api/schedule/' + schedule.id);
+        $('#schedule-id').val(schedule.id);
+
+        // フォームに値を設定
+        $('#title').val(schedule.title);
+        $('#description').val(schedule.description || '');
+        $('#location').val(schedule.location || '');
+        $('#priority').val(schedule.priority || 'normal');
+        $('#visibility').val(schedule.visibility || 'public');
+        $('#status').val(schedule.status || 'scheduled');
+        $('#repeat_type').val(schedule.repeat_type || 'none');
+
+        // 日時設定
+        const startDateTime = moment(schedule.start_time);
+        const endDateTime = moment(schedule.end_time);
+
+        $('#start_time_date').val(startDateTime.format('YYYY-MM-DD'));
+        $('#start_time_time').val(startDateTime.format('HH:mm'));
+        $('#end_time_date').val(endDateTime.format('YYYY-MM-DD'));
+        $('#end_time_time').val(endDateTime.format('HH:mm'));
+
+        // 終日設定
+        const isAllDay = schedule.all_day == 1;
+        $('#all_day').prop('checked', isAllDay);
+        if (!isAllDay) {
+            $('.time-picker').hide();
+        } else {
+            $('.time-picker').show();
+        }
+
+        // 表示/非表示設定
+        $('.edit-mode').show();
+        $('.view-mode').hide();
+        $('.delete-btn').show();
+        $('.delete-btn').data('id', schedule.id);
+
+        // 繰り返し設定の表示/非表示
+        if (schedule.repeat_type && schedule.repeat_type !== 'none') {
+            $('.repeat-options').show();
+            $('#repeat_end_date').val(schedule.repeat_end_date || '');
+        } else {
+            $('.repeat-options').hide();
+        }
+
+        // 公開範囲に応じた表示/非表示
+        if (schedule.visibility === 'specific') {
+            $('.organization-select-container').show();
+        } else {
+            $('.organization-select-container').hide();
+        }
+
+        // モーダル表示
+        $('#schedule-modal').modal('show');
+
+        // モーダル表示後に初期化を実行
+        setTimeout(() => {
+            // 日付ピッカーと時間ピッカーの初期化
+            this.initDateTimePickers();
+
+            // 参加者選択の初期化
+            this.initParticipantSelect();
+
+            // 参加者データをセット
+            if (schedule.participants && schedule.participants.length > 0) {
+                // Select2が初期化されるのを待つ
+                setTimeout(() => {
+                    // セレクトボックスをクリア
+                    $('#participants').empty();
+
+                    // 参加者のオプションを追加
+                    schedule.participants.forEach(participant => {
+                        const option = new Option(
+                            participant.display_name,
+                            participant.id,
+                            true,
+                            true
+                        );
+                        $('#participants').append(option);
+                    });
+
+                    // Select2の表示を更新
+                    $('#participants').trigger('change');
+                }, 500);
+            }
+
+            // 共有組織データをセット
+            if (schedule.organizations && schedule.organizations.length > 0) {
+                // Select2が初期化されるのを待つ
+                setTimeout(() => {
+                    // セレクトボックスをクリア
+                    $('#organizations').empty();
+
+                    // 組織のオプションを追加
+                    schedule.organizations.forEach(org => {
+                        const option = new Option(
+                            org.name,
+                            org.id,
+                            true,
+                            true
+                        );
+                        $('#organizations').append(option);
+                    });
+
+                    // Select2の表示を更新
+                    $('#organizations').trigger('change');
+                }, 500);
+            }
+        }, 500);
+    },
+
+    // 現在の表示を再読み込み
+    reloadCurrentView: function () {
+        console.log("Reloading current view:", this.currentView);
+        switch (this.currentView) {
+            case 'day':
+                const dayDate = $('#current-date').val();
+                const dayUserId = $('#user-id').val();
+                this.loadDaySchedules(dayDate, dayUserId);
+                break;
+            case 'week':
+                const weekDate = $('#current-date').val();
+                const weekUserId = $('#user-id').val();
+                this.loadWeekSchedules(weekDate, weekUserId);
+                break;
+            case 'month':
+                const year = $('#current-year').val();
+                const month = $('#current-month').val();
+                const monthUserId = $('#user-id').val();
+                this.loadMonthSchedules(year, month, monthUserId);
+                break;
+        }
+    },
+
     // フォームページの初期化
     initForm: function () {
         // 日付時間ピッカーの初期化
@@ -189,7 +865,7 @@ const Schedule = {
 
         // 終日フラグの処理
         $('#all_day').on('change', function () {
-            if ($(this).is(':checked')) {
+            if (!$(this).is(':checked')) {
                 // 終日の場合は時間部分を非表示にして00:00-23:59に設定
                 $('.time-picker').hide();
                 $('#start_time_time').val('00:00');
@@ -201,7 +877,7 @@ const Schedule = {
         });
 
         // 初期表示（チェックボックスの状態に合わせる）
-        if ($('#all_day').is(':checked')) {
+        if (!$('#all_day').is(':checked')) {
             $('.time-picker').hide();
         }
 
@@ -218,9 +894,9 @@ const Schedule = {
         // 公開範囲の変更処理
         $('#visibility').on('change', function () {
             if ($(this).val() === 'specific') {
-                $('.visibility-specific').show();
+                $('.organization-select-container').show();
             } else {
-                $('.visibility-specific').hide();
+                $('.organization-select-container').hide();
             }
         });
 
@@ -258,30 +934,48 @@ const Schedule = {
             const endTime = $('#end_time_time').val();
             $('#end_time').val(endDate + ' ' + endTime);
 
-            return true;
+            // return true;
         });
     },
 
     // 日付時間ピッカーの初期化
     initDateTimePickers: function () {
-        // 日付ピッカーの設定
-        flatpickr('.date-picker', {
+        console.log("Initializing date/time pickers");
+
+        // 既存のピッカーがあれば破棄
+        $('.date-picker').each(function () {
+            if (this._flatpickr) {
+                this._flatpickr.destroy();
+            }
+        });
+
+        $('.time-picker').each(function () {
+            if (this._flatpickr) {
+                this._flatpickr.destroy();
+            }
+        });
+
+        // 日付ピッカーの初期化
+        flatpickr("#start_time_date, #end_time_date, #repeat_end_date", {
             dateFormat: 'Y-m-d',
             locale: 'ja',
             disableMobile: true,
             onChange: function (selectedDates, dateStr, instance) {
                 // 開始日が変更された場合、終了日も更新（終了日が開始日より前の場合）
                 if (instance.element.id === 'start_time_date') {
-                    const endDatePicker = document.getElementById('end_time_date')._flatpickr;
-                    if (endDatePicker.selectedDates[0] < selectedDates[0]) {
-                        endDatePicker.setDate(dateStr);
+                    const endDateEl = document.getElementById('end_time_date');
+                    if (endDateEl && endDateEl._flatpickr) {
+                        const endDate = endDateEl._flatpickr.selectedDates[0];
+                        if (endDate < selectedDates[0]) {
+                            endDateEl._flatpickr.setDate(dateStr);
+                        }
                     }
                 }
             }
         });
 
-        // 時間ピッカーの設定
-        flatpickr('.time-picker', {
+        // 時間ピッカーの初期化
+        flatpickr("#start_time_time, #end_time_time", {
             enableTime: true,
             noCalendar: true,
             dateFormat: 'H:i',
@@ -289,29 +983,37 @@ const Schedule = {
             minuteIncrement: 15,
             disableMobile: true,
             onChange: function (selectedDates, dateStr, instance) {
-                // 開始時間が変更された場合、終了時間も更新（同日かつ終了時間が開始時間より前の場合）
+                // 開始時間が変更された場合、終了時間も更新
                 if (instance.element.id === 'start_time_time') {
-                    const startDate = document.getElementById('start_time_date').value;
-                    const endDate = document.getElementById('end_time_date').value;
+                    const startDateEl = document.getElementById('start_time_date');
+                    const endDateEl = document.getElementById('end_time_date');
+                    const endTimeEl = document.getElementById('end_time_time');
 
-                    if (startDate === endDate) {
-                        const endTimePicker = document.getElementById('end_time_time')._flatpickr;
-                        const endTime = endTimePicker.selectedDates[0];
-                        const startTime = new Date();
+                    if (startDateEl && endDateEl && endTimeEl && endTimeEl._flatpickr) {
+                        if (startDateEl.value === endDateEl.value) {
+                            const startHour = parseInt(dateStr.split(':')[0], 10);
+                            const startMinute = parseInt(dateStr.split(':')[1], 10);
 
-                        startTime.setHours(parseInt(dateStr.split(':')[0]));
-                        startTime.setMinutes(parseInt(dateStr.split(':')[1]));
+                            const endTime = endTimeEl._flatpickr.selectedDates[0];
+                            if (endTime) {
+                                const endHour = endTime.getHours();
+                                const endMinute = endTime.getMinutes();
 
-                        if (endTime <= startTime) {
-                            // 開始時間の1時間後を設定
-                            const newEndTime = new Date(startTime);
-                            newEndTime.setHours(newEndTime.getHours() + 1);
-                            endTimePicker.setDate(newEndTime);
+                                // 開始時間が終了時間以降の場合、終了時間を1時間後に設定
+                                if (startHour > endHour || (startHour === endHour && startMinute >= endMinute)) {
+                                    const newEndTime = new Date();
+                                    newEndTime.setHours(startHour + 1);
+                                    newEndTime.setMinutes(startMinute);
+                                    endTimeEl._flatpickr.setDate(newEndTime);
+                                }
+                            }
                         }
                     }
                 }
             }
         });
+
+        console.log("Date/time pickers initialized");
     },
 
     // 詳細ページの初期化
@@ -384,7 +1086,21 @@ const Schedule = {
             },
             dateClick: (info) => {
                 // 日付クリック時のイベント
-                window.location.href = BASE_PATH + '/schedule/day?date=' + info.dateStr;
+                if ($('#schedule-modal').length) {
+                    // モーダルがある場合はモーダルで表示
+                    this.showCreateModal(info.dateStr, '09:00', true);
+                } else {
+                    // モーダルがない場合は従来の遷移
+                    window.location.href = BASE_PATH + '/schedule/day?date=' + info.dateStr;
+                }
+            },
+            eventClick: (info) => {
+                // スケジュールクリック時のイベント
+                info.jsEvent.preventDefault();
+                if ($('#schedule-modal').length) {
+                    // モーダルがある場合はモーダルで表示
+                    this.showViewModal(info.event.id);
+                }
             }
         });
 
@@ -396,95 +1112,88 @@ const Schedule = {
         });
     },
 
-    // 日付時間ピッカーの初期化
-    // initDateTimePickers: function () {
-    //     // flatpickrの初期化
-    //     flatpickr('.date-picker', {
-    //         dateFormat: 'Y-m-d',
-    //         locale: 'ja',
-    //         disableMobile: true
-    //     });
-
-    //     flatpickr('.time-picker', {
-    //         enableTime: true,
-    //         noCalendar: true,
-    //         dateFormat: 'H:i',
-    //         time_24hr: true,
-    //         minuteIncrement: 5,
-    //         disableMobile: true
-    //     });
-    // },
-
     // 参加者セレクトの初期化
     initParticipantSelect: function () {
-        // Select2の初期化
-        $('.participant-select').select2({
-            placeholder: '参加者を選択してください',
-            allowClear: true,
-            ajax: {
-                url: BASE_PATH + '/api/users',
-                dataType: 'json',
-                delay: 250,
-                data: function (params) {
-                    return {
-                        search: params.term,
-                        page: params.page || 1
-                    };
-                },
-                processResults: function (data, params) {
-                    params.page = params.page || 1;
+        console.log("Initializing participant select");
 
-                    return {
-                        results: data.data.users.map(user => ({
-                            id: user.id,
-                            text: user.display_name + ' (' + user.username + ')'
-                        })),
-                        pagination: {
-                            more: (params.page * 20) < data.data.pagination.total
+        // Select2が利用可能か確認
+        if (typeof $.fn.select2 === 'undefined') {
+            console.error("Select2 is not loaded! Make sure jQuery and Select2 are properly included.");
+            return;
+        }
+
+        try {
+            // 参加者選択の初期化
+            $('#participants').select2({
+                placeholder: '参加者を選択してください',
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: BASE_PATH + '/api/active-users',
+                    dataType: 'json',
+                    delay: 250,
+                    processResults: function (data) {
+                        console.log("User data received:", data);
+                        if (data.success && Array.isArray(data.data)) {
+                            return {
+                                results: data.data.map(user => ({
+                                    id: user.id,
+                                    text: user.display_name + ' (' + user.username + ')'
+                                }))
+                            };
+                        } else {
+                            console.error("Invalid user data format:", data);
+                            return { results: [] };
                         }
-                    };
-                },
-                cache: true
-            },
-            templateResult: function (user) {
-                if (!user.id) return user.text;
-                return $('<span>' + user.text + '</span>');
-            }
-        });
+                    },
+                    cache: true
+                }
+            });
+
+            // 組織選択の初期化
+            $('#organizations').select2({
+                placeholder: '組織を選択してください',
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: BASE_PATH + '/api/organizations',
+                    dataType: 'json',
+                    delay: 250,
+                    processResults: function (data) {
+                        console.log("Organization data received:", data);
+                        if (data.success && Array.isArray(data.data)) {
+                            return {
+                                results: data.data.map(org => ({
+                                    id: org.id,
+                                    text: org.name + ' (' + org.code + ')'
+                                }))
+                            };
+                        } else {
+                            console.error("Invalid organization data format:", data);
+                            return { results: [] };
+                        }
+                    },
+                    cache: true
+                }
+            });
+
+            console.log("Select2 components initialized");
+        } catch (e) {
+            console.error("Error initializing Select2:", e);
+        }
     },
 
     // 組織共有セレクトの初期化
     initOrganizationSelect: function () {
-        // Select2の初期化
-        $('.organization-select').select2({
-            placeholder: '組織を選択してください',
-            allowClear: true,
-            ajax: {
-                url: BASE_PATH + '/api/organizations',
-                dataType: 'json',
-                delay: 250,
-                data: function (params) {
-                    return {
-                        search: params.term
-                    };
-                },
-                processResults: function (data) {
-                    return {
-                        results: data.data.map(org => ({
-                            id: org.id,
-                            text: org.name + ' (' + org.code + ')'
-                        }))
-                    };
-                },
-                cache: true
-            }
-        });
+        // 既に initParticipantSelect で初期化されているので何もしない
     },
 
     // 日単位スケジュールの読み込み
     loadDaySchedules: function (date, userId) {
+        console.log("Loading day schedules for date:", date, "user:", userId);
         App.apiGet('/api/schedule/day', { date: date, user_id: userId })
             .then(response => {
+                console.log("Day schedules response:", response);
                 if (response.success) {
                     const schedules = response.data;
                     this.renderDaySchedules(schedules, date);
@@ -493,8 +1202,8 @@ const Schedule = {
                 }
             })
             .catch(error => {
+                console.error("Error loading day schedules:", error);
                 App.showNotification('スケジュールの読み込みに失敗しました', 'error');
-                console.error(error);
             });
     },
 
@@ -502,7 +1211,7 @@ const Schedule = {
     renderDaySchedules: function (schedules, date) {
         const container = $('#day-schedule-container');
 
-        if (schedules.length === 0) {
+        if (!Array.isArray(schedules) || schedules.length === 0) {
             container.html('<div class="alert alert-info">スケジュールはありません</div>');
             return;
         }
@@ -563,7 +1272,7 @@ const Schedule = {
                     html += this.renderScheduleTimelineItem(schedule);
                 });
             } else {
-                html += '<div class="empty-slot" data-hour="' + hour + '"></div>';
+                html += '<div class="empty-slot" data-hour="' + hour + '" data-date="' + date + '"></div>';
             }
 
             html += '</div></div>';
@@ -572,21 +1281,14 @@ const Schedule = {
         html += '</div>';
 
         container.html(html);
-
-        // 空のスロットのクリックイベント
-        $('.empty-slot').on('click', function () {
-            const hour = $(this).data('hour');
-            const newDate = moment(date).format('YYYY-MM-DD');
-            const newTime = hour.toString().padStart(2, '0') + ':00';
-
-            window.location.href = BASE_PATH + '/schedule/create?date=' + newDate + '&time=' + newTime;
-        });
     },
 
     // 週単位スケジュールの読み込み
     loadWeekSchedules: function (date, userId) {
+        console.log("Loading week schedules for date:", date, "user:", userId);
         App.apiGet('/api/schedule/week', { date: date, user_id: userId })
             .then(response => {
+                console.log("Week schedules response:", response);
                 if (response.success) {
                     const data = response.data;
                     this.renderWeekSchedules(data.schedules, data.week_dates);
@@ -595,8 +1297,8 @@ const Schedule = {
                 }
             })
             .catch(error => {
+                console.error("Error loading week schedules:", error);
                 App.showNotification('スケジュールの読み込みに失敗しました', 'error');
-                console.error(error);
             });
     },
 
@@ -620,35 +1322,37 @@ const Schedule = {
         });
 
         // スケジュールを日付と時間帯に振り分け
-        schedules.forEach(schedule => {
-            const startDate = moment(schedule.start_time).format('YYYY-MM-DD');
-            const endDate = moment(schedule.end_time).format('YYYY-MM-DD');
+        if (Array.isArray(schedules)) {
+            schedules.forEach(schedule => {
+                const startDate = moment(schedule.start_time).format('YYYY-MM-DD');
+                const endDate = moment(schedule.end_time).format('YYYY-MM-DD');
 
-            // 複数日にまたがるスケジュールは各日に表示
-            for (let d = 0; d < weekDates.length; d++) {
-                const currentDate = weekDates[d];
+                // 複数日にまたがるスケジュールは各日に表示
+                for (let d = 0; d < weekDates.length; d++) {
+                    const currentDate = weekDates[d];
 
-                // スケジュールの期間と現在の日付が重なるかチェック
-                if (currentDate >= startDate && currentDate <= endDate) {
-                    if (schedule.all_day == 1) {
-                        dailySchedules[currentDate].allDay.push(schedule);
-                    } else {
-                        // 開始日の場合は開始時間の時間帯に振り分け
-                        if (currentDate === startDate) {
-                            const startTime = moment(schedule.start_time).format('HH:mm');
-                            const hourStr = startTime.substring(0, 2) + ':00';
-
-                            if (dailySchedules[currentDate].timeSlots[hourStr]) {
-                                dailySchedules[currentDate].timeSlots[hourStr].push(schedule);
-                            }
+                    // スケジュールの期間と現在の日付が重なるかチェック
+                    if (currentDate >= startDate && currentDate <= endDate) {
+                        if (schedule.all_day == 1) {
+                            dailySchedules[currentDate].allDay.push(schedule);
                         } else {
-                            // 開始日以外の場合は0時の時間帯に振り分け
-                            dailySchedules[currentDate].timeSlots['00:00'].push(schedule);
+                            // 開始日の場合は開始時間の時間帯に振り分け
+                            if (currentDate === startDate) {
+                                const startTime = moment(schedule.start_time).format('HH:mm');
+                                const hourStr = startTime.substring(0, 2) + ':00';
+
+                                if (dailySchedules[currentDate].timeSlots[hourStr]) {
+                                    dailySchedules[currentDate].timeSlots[hourStr].push(schedule);
+                                }
+                            } else {
+                                // 開始日以外の場合は0時の時間帯に振り分け
+                                dailySchedules[currentDate].timeSlots['00:00'].push(schedule);
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
 
         // HTML生成
         let html = '<div class="week-schedule">';
@@ -722,30 +1426,14 @@ const Schedule = {
         html += '</div>';
 
         container.html(html);
-
-        // セルのクリックイベント
-        $('.week-day-content').on('click', function (e) {
-            // スケジュールアイテムのクリックは除外
-            if ($(e.target).closest('.schedule-item').length === 0) {
-                const date = $(this).data('date');
-                const hour = $(this).data('hour');
-
-                if (date) {
-                    if (hour !== undefined) {
-                        const time = hour.toString().padStart(2, '0') + ':00';
-                        window.location.href = BASE_PATH + '/schedule/create?date=' + date + '&time=' + time;
-                    } else {
-                        window.location.href = BASE_PATH + '/schedule/create?date=' + date + '&all_day=1';
-                    }
-                }
-            }
-        });
     },
 
     // 月単位スケジュールの読み込み
     loadMonthSchedules: function (year, month, userId) {
+        console.log("Loading month schedules for year:", year, "month:", month, "user:", userId);
         App.apiGet('/api/schedule/month', { year: year, month: month, user_id: userId })
             .then(response => {
+                console.log("Month schedules response:", response);
                 if (response.success) {
                     const data = response.data;
                     this.renderMonthSchedules(data.schedules, year, month, data.days_in_month, data.first_day_of_week);
@@ -754,8 +1442,8 @@ const Schedule = {
                 }
             })
             .catch(error => {
+                console.error("Error loading month schedules:", error);
                 App.showNotification('スケジュールの読み込みに失敗しました', 'error');
-                console.error(error);
             });
     },
 
@@ -771,25 +1459,27 @@ const Schedule = {
         }
 
         // スケジュールを日付に振り分け
-        schedules.forEach(schedule => {
-            const startDate = moment(schedule.start_time).format('YYYY-MM-DD');
-            const endDate = moment(schedule.end_time).format('YYYY-MM-DD');
+        if (Array.isArray(schedules)) {
+            schedules.forEach(schedule => {
+                const startDate = moment(schedule.start_time).format('YYYY-MM-DD');
+                const endDate = moment(schedule.end_time).format('YYYY-MM-DD');
 
-            // スケジュールの期間内の各日に振り分け
-            const start = moment(startDate);
-            const end = moment(endDate);
+                // スケジュールの期間内の各日に振り分け
+                const start = moment(startDate);
+                const end = moment(endDate);
 
-            for (let m = moment(start); m.isSameOrBefore(end); m.add(1, 'days')) {
-                const currentDate = m.format('YYYY-MM-DD');
+                for (let m = moment(start); m.isSameOrBefore(end); m.add(1, 'days')) {
+                    const currentDate = m.format('YYYY-MM-DD');
 
-                // 表示対象月のみ処理
-                if (m.month() + 1 == month && m.year() == year) {
-                    if (dailySchedules[currentDate]) {
-                        dailySchedules[currentDate].push(schedule);
+                    // 表示対象月のみ処理
+                    if (m.month() + 1 == month && m.year() == year) {
+                        if (dailySchedules[currentDate]) {
+                            dailySchedules[currentDate].push(schedule);
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
 
         // カレンダーHTML生成
         let html = '<div class="month-calendar">';
@@ -860,17 +1550,10 @@ const Schedule = {
 
         container.html(html);
 
-        // 日付セルのクリックイベント
-        $('.calendar-day').on('click', function (e) {
-            // スケジュールアイテムのクリックは除外
-            if ($(e.target).closest('.schedule-item, .more-schedules').length === 0) {
-                const date = $(this).data('date');
-                window.location.href = BASE_PATH + '/schedule/day?date=' + date;
-            }
-        });
-
         // 「他 ○ 件」クリック時のイベント
-        $('.more-schedules').on('click', function () {
+        $('.more-schedules').on('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
             const date = $(this).closest('.calendar-day').data('date');
             window.location.href = BASE_PATH + '/schedule/day?date=' + date;
         });
@@ -884,14 +1567,14 @@ const Schedule = {
         const priorityClass = this.getPriorityClass(schedule.priority);
 
         return `
-            <a href="${BASE_PATH}/schedule/view/${schedule.id}" class="list-group-item list-group-item-action ${priorityClass}">
+            <div class="list-group-item list-group-item-action ${priorityClass} schedule-item" data-id="${schedule.id}">
                 <div class="d-flex w-100 justify-content-between">
                     <h5 class="mb-1">${schedule.title}</h5>
                     <small>${timeDisplay}</small>
                 </div>
                 <p class="mb-1">${schedule.description || ''}</p>
                 <small>${schedule.creator_name}</small>
-            </a>
+            </div>
         `;
     },
 
@@ -903,11 +1586,9 @@ const Schedule = {
         const priorityClass = this.getPriorityClass(schedule.priority);
 
         return `
-            <div class="schedule-item ${priorityClass}">
-                <a href="${BASE_PATH}/schedule/view/${schedule.id}">
-                    <div class="schedule-time">${timeDisplay}</div>
-                    <div class="schedule-title">${schedule.title}</div>
-                </a>
+            <div class="schedule-item ${priorityClass}" data-id="${schedule.id}">
+                <div class="schedule-time">${timeDisplay}</div>
+                <div class="schedule-title">${schedule.title}</div>
             </div>
         `;
     },
@@ -920,11 +1601,9 @@ const Schedule = {
         const priorityClass = this.getPriorityClass(schedule.priority);
 
         return `
-            <div class="schedule-item ${priorityClass}">
-                <a href="${BASE_PATH}/schedule/view/${schedule.id}">
-                    <div class="schedule-title">${schedule.title}</div>
-                    ${timeDisplay ? '<div class="schedule-time">' + timeDisplay + '</div>' : ''}
-                </a>
+            <div class="schedule-item ${priorityClass}" data-id="${schedule.id}">
+                <div class="schedule-title">${schedule.title}</div>
+                ${timeDisplay ? '<div class="schedule-time">' + timeDisplay + '</div>' : ''}
             </div>
         `;
     },
@@ -935,10 +1614,8 @@ const Schedule = {
         const allDayClass = schedule.all_day == 1 ? 'all-day' : '';
 
         return `
-            <div class="schedule-item ${priorityClass} ${allDayClass}">
-                <a href="${BASE_PATH}/schedule/view/${schedule.id}">
-                    ${schedule.title}
-                </a>
+            <div class="schedule-item ${priorityClass} ${allDayClass}" data-id="${schedule.id}">
+                ${schedule.title}
             </div>
         `;
     },
@@ -1050,6 +1727,20 @@ const Schedule = {
         // ボタン状態を更新
         $('.btn-participation-status').removeClass('active');
         $(`.btn-participation-status[data-status="${status}"]`).addClass('active');
+    },
+
+    // 参加ステータスのバッジを取得
+    getParticipationStatusBadge: function (status) {
+        switch (status) {
+            case 'accepted':
+                return '<span class="badge bg-success">参加</span>';
+            case 'declined':
+                return '<span class="badge bg-danger">不参加</span>';
+            case 'tentative':
+                return '<span class="badge bg-warning">未定</span>';
+            default:
+                return '<span class="badge bg-secondary">未回答</span>';
+        }
     },
 
     // 優先度に応じたカラークラスを取得

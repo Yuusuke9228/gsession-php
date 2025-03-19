@@ -5,6 +5,7 @@ namespace Controllers;
 use Core\Controller;
 use Core\Database;
 use Core\Auth;
+use Error;
 use Models\Schedule;
 use Models\User;
 use Models\Organization;
@@ -397,8 +398,12 @@ class ScheduleController extends Controller
     // 日単位スケジュールAPI
     public function apiGetDay($params)
     {
-        $date = $params['date'] ?? date('Y-m-d');
-        $userId = $params['user_id'] ?? $this->auth->id();
+        // $date = $params['date'] ?? date('Y-m-d');
+        // $userId = $params['user_id'] ?? $this->auth->id();
+        // パラメータが欠落している場合は直接$_GETから取得
+        $date = isset($params['date']) ? $params['date'] : (isset($_GET['date']) ? $_GET['date'] : date('Y-m-d'));
+        $userId = isset($params['user_id']) ? $params['user_id'] : (isset($_GET['user_id']) ? $_GET['user_id'] : $this->auth->id());
+
 
         // 日付の妥当性をチェック
         if (!$this->isValidDate($date)) {
@@ -426,8 +431,10 @@ class ScheduleController extends Controller
     // 週単位スケジュールAPI
     public function apiGetWeek($params)
     {
-        $date = $params['date'] ?? date('Y-m-d');
-        $userId = $params['user_id'] ?? $this->auth->id();
+        // パラメータが欠落している場合は直接$_GETから取得
+        $date = isset($params['date']) ? $params['date'] : (isset($_GET['date']) ? $_GET['date'] : date('Y-m-d'));
+        $userId = isset($params['user_id']) ? $params['user_id'] : (isset($_GET['user_id']) ? $_GET['user_id'] : $this->auth->id());
+        error_log("API Get Week called with date: " . $date . ", user_id: " . $userId);
 
         // 日付の妥当性をチェック
         if (!$this->isValidDate($date)) {
@@ -441,18 +448,32 @@ class ScheduleController extends Controller
         }
 
         // 週の開始日と終了日を取得（月曜日から日曜日）
-        $dayOfWeek = date('N', strtotime($date));
-        $weekStart = date('Y-m-d', strtotime($date . ' -' . ($dayOfWeek - 1) . ' days'));
-        $weekEnd = date('Y-m-d', strtotime($weekStart . ' +6 days'));
+        // ここが問題: 渡された日付に基づいて週の日付を計算する必要がある
+        $momentDate = new \DateTime($date);
+        $dayOfWeek = (int)$momentDate->format('N'); // 1（月曜日）から7（日曜日）
+
+        // 現在の日付から週の開始日（月曜日）を計算
+        $daysToSubtract = $dayOfWeek - 1;
+        $weekStart = clone $momentDate;
+        $weekStart->modify("-{$daysToSubtract} days");
+
+        // 週の終了日（日曜日）を計算
+        $weekEnd = clone $weekStart;
+        $weekEnd->modify('+6 days');
+
+        $startDate = $weekStart->format('Y-m-d');
+        $endDate = $weekEnd->format('Y-m-d');
 
         // 週の日付配列を生成
         $weekDates = [];
+        $currentDate = clone $weekStart;
         for ($i = 0; $i < 7; $i++) {
-            $weekDates[] = date('Y-m-d', strtotime($weekStart . ' +' . $i . ' days'));
+            $weekDates[] = $currentDate->format('Y-m-d');
+            $currentDate->modify('+1 day');
         }
 
         // スケジュールデータを取得
-        $schedules = $this->schedule->getByDateRange($weekStart, $weekEnd, $userId);
+        $schedules = $this->schedule->getByDateRange($startDate, $endDate, $userId);
 
         // 閲覧権限でフィルタリング
         $filteredSchedules = array_filter($schedules, [$this, 'canViewSchedule']);
@@ -469,9 +490,13 @@ class ScheduleController extends Controller
     // 月単位スケジュールAPI
     public function apiGetMonth($params)
     {
-        $year = $params['year'] ?? date('Y');
-        $month = $params['month'] ?? date('m');
-        $userId = $params['user_id'] ?? $this->auth->id();
+        // $year = $params['year'] ?? date('Y');
+        // $month = $params['month'] ?? date('m');
+        // $userId = $params['user_id'] ?? $this->auth->id();
+        // パラメータが欠落している場合は直接$_GETから取得
+        $year = isset($params['year']) ? $params['year'] : (isset($_GET['year']) ? $_GET['year'] : date('Y'));
+        $month = isset($params['month']) ? $params['month'] : (isset($_GET['month']) ? $_GET['month'] : date('m'));
+        $userId = isset($params['user_id']) ? $params['user_id'] : (isset($_GET['user_id']) ? $_GET['user_id'] : $this->auth->id());
 
         // 年月の妥当性をチェック
         if ($year < 1970 || $year > 2099 || $month < 1 || $month > 12) {
@@ -497,6 +522,17 @@ class ScheduleController extends Controller
 
         // スケジュールデータを取得
         $schedules = $this->schedule->getByDateRange($startDate, $endDate, $userId);
+        // apiGetMonth メソッド内に追加
+        // テーブルのデータを確認
+        $db = \Core\Database::getInstance();
+        $participantsSql = "SELECT * FROM schedule_participants";
+        $participantsResults = $db->fetchAll($participantsSql);
+        error_log("participants table data: " . json_encode($participantsResults));
+
+        $orgsSql = "SELECT * FROM schedule_organizations";
+        $orgsResults = $db->fetchAll($orgsSql);
+        error_log("organizations table data: " . json_encode($orgsResults));
+        error_log(json_encode(['schedules' => $schedules]));
 
         // 閲覧権限でフィルタリング
         $filteredSchedules = array_filter($schedules, [$this, 'canViewSchedule']);
@@ -517,7 +553,7 @@ class ScheduleController extends Controller
         $startDate = $params['start_date'] ?? date('Y-m-d');
         $endDate = $params['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
         $userId = $params['user_id'] ?? $this->auth->id();
-
+        error_log("getByDateRange called: startDate=$startDate, endDate=$endDate, userId=$userId");
         // 日付の妥当性をチェック
         if (!$this->isValidDate($startDate)) {
             $startDate = date('Y-m-d');
@@ -584,10 +620,10 @@ class ScheduleController extends Controller
         ];
     }
 
-    // スケジュール新規作成API
+    // API: スケジュール新規作成
     public function apiCreate($params, $data)
     {
-        // バリデーション
+        // error_log(json_encode(['postdata:' => $data]));
         $validation = $this->validateScheduleData($data);
         if (!empty($validation)) {
             return [
@@ -628,36 +664,71 @@ class ScheduleController extends Controller
 
         // 参加者を追加
         $participants = isset($data['participants']) ? $data['participants'] : [];
+
+        // 配列でない場合の処理を修正
         if (!is_array($participants)) {
-            $participants = [];
+            if (is_string($participants) && !empty($participants)) {
+                $participants = explode(',', $participants);
+            } else {
+                $participants = [];
+            }
         }
 
         // 作成者を参加者に追加
-        $participants[] = $userId;
+        if (!in_array($userId, $participants)) {
+            $participants[] = $userId;
+        }
+
+        // 参加者のフィルタリングを確実に
+        $participants = array_filter($participants, function ($id) {
+            return !empty($id) && is_numeric($id);
+        });
         $participants = array_unique($participants);
 
+        // デバッグ出力を追加
+        // error_log("Schedule ID: " . $scheduleId);
+        // error_log("Participants: " . print_r($participants, true));
+
+        // 参加者を追加
         foreach ($participants as $participantId) {
+            // IDの型を確保
+            $participantId = (int)$participantId;
+            if (!$participantId) continue;
+
             // 参加者が自分自身の場合は「参加」、それ以外は「未回答」
             $status = ($participantId == $userId) ? 'accepted' : 'pending';
-            $this->schedule->addParticipant($scheduleId, $participantId, $status);
+
+            // 参加者追加
+            $result = $this->schedule->addParticipant($scheduleId, $participantId, $status);
+            if (!$result) {
+                error_log("Failed to add participant: $participantId");
+            }
         }
 
         // 共有組織を追加
         $organizations = isset($data['organizations']) ? $data['organizations'] : [];
         if (!is_array($organizations)) {
-            $organizations = [];
+            if (is_string($organizations) && !empty($organizations)) {
+                $organizations = explode(',', $organizations);
+            } else {
+                $organizations = [];
+            }
         }
 
+        // 組織IDのフィルタリング
+        $organizations = array_filter($organizations, function ($id) {
+            return !empty($id) && is_numeric($id);
+        });
+
         foreach ($organizations as $organizationId) {
-            $this->schedule->addSharedOrganization($scheduleId, $organizationId);
+            $this->schedule->addSharedOrganization($scheduleId, (int)$organizationId);
         }
 
         return [
             'success' => true,
             'message' => 'スケジュールが正常に作成されました',
             'data' => [
-                'id' => $scheduleId,
-                'redirect' => BASE_PATH . '/schedule/view/' . $scheduleId
+                'id' => $scheduleId
             ]
         ];
     }
@@ -1212,4 +1283,6 @@ class ScheduleController extends Controller
         // 編集権限と同じ
         return $this->canEditSchedule($schedule);
     }
+
+    
 }

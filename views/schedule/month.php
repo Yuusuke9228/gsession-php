@@ -3,11 +3,13 @@
 $pageTitle = 'スケジュール（月表示） - GroupWare';
 $monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 ?>
+<?php include __DIR__ . '/modal.php'; ?>
 <div class="container-fluid" data-page-type="month">
     <input type="hidden" id="current-year" value="<?php echo $year; ?>">
     <input type="hidden" id="current-month" value="<?php echo $month; ?>">
     <input type="hidden" id="user-id" value="<?php echo $userId; ?>">
-    
+    <input type="hidden" id="current-user-id" value="<?php echo $this->auth->id(); ?>">
+
     <div class="row mb-4 align-items-center">
         <div class="col">
             <h1 class="h3"><?php echo $year; ?>年<?php echo $monthNames[(int)$month]; ?> - スケジュール管理</h1>
@@ -44,7 +46,7 @@ $monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月
             </button>
         </div>
     </div>
-    
+
     <div class="row mb-3">
         <div class="col-md-4">
             <label for="user-selector" class="visually-hidden">ユーザー選択</label>
@@ -63,7 +65,7 @@ $monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月
             </select>
         </div>
     </div>
-    
+
     <div class="card">
         <div class="card-body p-0">
             <div id="month-schedule-container">
@@ -79,120 +81,120 @@ $monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月
 </div>
 
 <style>
-/* 月カレンダー用スタイル */
-.month-calendar {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-}
+    /* 月カレンダー用スタイル */
+    .month-calendar {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
 
-.week-row {
-    display: flex;
-    width: 100%;
-}
+    .week-row {
+        display: flex;
+        width: 100%;
+    }
 
-.header-row {
-    background-color: #f8f9fa;
-    font-weight: bold;
-}
+    .header-row {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
 
-.day-cell {
-    flex: 1;
-    min-height: 120px;
-    border: 1px solid #dee2e6;
-    position: relative;
-    overflow: hidden;
-}
+    .day-cell {
+        flex: 1;
+        min-height: 120px;
+        border: 1px solid #dee2e6;
+        position: relative;
+        overflow: hidden;
+    }
 
-.day-name {
-    text-align: center;
-    padding: 8px;
-    min-height: auto;
-}
+    .day-name {
+        text-align: center;
+        padding: 8px;
+        min-height: auto;
+    }
 
-.day-number {
-    position: absolute;
-    top: 5px;
-    left: 5px;
-    width: 24px;
-    height: 24px;
-    text-align: center;
-    font-weight: bold;
-}
+    .day-number {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        width: 24px;
+        height: 24px;
+        text-align: center;
+        font-weight: bold;
+    }
 
-.day-content {
-    padding-top: 30px;
-    padding-left: 5px;
-    padding-right: 5px;
-    height: calc(100% - 30px);
-    overflow: hidden;
-}
+    .day-content {
+        padding-top: 30px;
+        padding-left: 5px;
+        padding-right: 5px;
+        height: calc(100% - 30px);
+        overflow: hidden;
+    }
 
-.empty-cell {
-    background-color: #f8f9fa;
-}
+    .empty-cell {
+        background-color: #f8f9fa;
+    }
 
-.today {
-    background-color: #fff3cd;
-}
+    .today {
+        background-color: #fff3cd;
+    }
 
-.weekend {
-    background-color: #f8f8f8;
-}
+    .weekend {
+        background-color: #f8f8f8;
+    }
 
-.calendar-day {
-    cursor: pointer;
-}
+    .calendar-day {
+        cursor: pointer;
+    }
 
-.calendar-day:hover {
-    background-color: #f0f0f0;
-}
+    .calendar-day:hover {
+        background-color: #f0f0f0;
+    }
 
-.schedule-item {
-    margin-bottom: 3px;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-size: 0.8rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+    .schedule-item {
+        margin-bottom: 3px;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
-.schedule-item a {
-    color: inherit;
-    text-decoration: none;
-    display: block;
-}
+    .schedule-item a {
+        color: inherit;
+        text-decoration: none;
+        display: block;
+    }
 
-.schedule-item.all-day {
-    border-left: 3px solid #007bff;
-}
+    .schedule-item.all-day {
+        border-left: 3px solid #007bff;
+    }
 
-.priority-high {
-    background-color: #f8d7da;
-    border-left: 3px solid #dc3545;
-}
+    .priority-high {
+        background-color: #f8d7da;
+        border-left: 3px solid #dc3545;
+    }
 
-.priority-normal {
-    background-color: #d1e7dd;
-    border-left: 3px solid #198754;
-}
+    .priority-normal {
+        background-color: #d1e7dd;
+        border-left: 3px solid #198754;
+    }
 
-.priority-low {
-    background-color: #cfe2ff;
-    border-left: 3px solid #0d6efd;
-}
+    .priority-low {
+        background-color: #cfe2ff;
+        border-left: 3px solid #0d6efd;
+    }
 
-.more-schedules {
-    text-align: center;
-    font-size: 0.8rem;
-    background-color: #f8f9fa;
-    padding: 2px;
-    border-radius: 3px;
-    cursor: pointer;
-}
+    .more-schedules {
+        text-align: center;
+        font-size: 0.8rem;
+        background-color: #f8f9fa;
+        padding: 2px;
+        border-radius: 3px;
+        cursor: pointer;
+    }
 
-.more-schedules:hover {
-    background-color: #e9ecef;
-}
+    .more-schedules:hover {
+        background-color: #e9ecef;
+    }
 </style>

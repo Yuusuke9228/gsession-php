@@ -198,3 +198,72 @@ body {
     background-color: #fff;
     cursor: pointer;
 }
+
+/* 月表示の曜日ヘッダーの高さを小さく */
+.month-calendar .week-row.header-row {
+  height: 40px; /* 高さを小さく設定 */
+  background-color: #cfdfef;
+}
+
+.month-calendar .day-name {
+  padding: 5px; /* パディングも小さく */
+  min-height: auto;
+  font-size: 0.9rem; /* フォントサイズも少し小さく */
+}
+/* 月表示で曜日ヘッダーを固定 */
+.month-calendar {
+  position: relative;
+}
+
+.month-calendar .week-row.header-row {
+  position: sticky;
+  top: 0;
+  background-color: #cfdfef;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+/* 週表示で曜日ヘッダーを固定 */
+.week-schedule {
+  position: relative;
+}
+
+.week-schedule .week-header {
+  position: sticky;
+  top: 0;
+  background-color: #cfdfef;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* 時間列も固定 */
+.week-schedule .week-time-column {
+  position: sticky;
+  left: 0;
+  background-color: #f8f9fa;
+  z-index: 5;
+}
+
+/* 時間列と曜日ヘッダーの交差部分 */
+.week-schedule .week-header .week-time-column {
+  z-index: 15;
+  background-color: #f0f0f0;
+}
+/* スクロールの挙動を改善 */
+.card-body {
+  overflow: auto;
+  max-height: calc(100vh - 200px); /* 画面の高さに応じて調整 */
+}
+
+/* スマホ表示時の調整 */
+@media (max-width: 768px) {
+  .week-schedule .week-header,
+  .month-calendar .week-row.header-row {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  .week-day {
+    min-width: 80px; /* 幅を小さく */
+  }
+}

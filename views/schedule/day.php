@@ -6,10 +6,12 @@ $pageTitle = 'スケジュール（日表示） - GroupWare';
 $formattedDate = date('Y年n月j日', strtotime($date));
 $dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date('w', strtotime($date))];
 ?>
+<?php include __DIR__ . '/modal.php'; ?>
 <div class="container-fluid" data-page-type="day">
     <input type="hidden" id="current-date" value="<?php echo $date; ?>">
     <input type="hidden" id="user-id" value="<?php echo $userId; ?>">
-    
+    <input type="hidden" id="current-user-id" value="<?php echo $this->auth->id(); ?>">
+
     <div class="row mb-4 align-items-center">
         <div class="col">
             <h1 class="h3"><?php echo $formattedDate; ?> (<?php echo $dayOfWeek; ?>) - スケジュール管理</h1>
@@ -46,7 +48,7 @@ $dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date('w', strtoti
             </button>
         </div>
     </div>
-    
+
     <div class="row mb-3">
         <div class="col-md-4">
             <label for="user-selector" class="visually-hidden">ユーザー選択</label>
@@ -65,7 +67,7 @@ $dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date('w', strtoti
             </select>
         </div>
     </div>
-    
+
     <div class="card">
         <div class="card-body">
             <div id="day-schedule-container">
@@ -81,73 +83,73 @@ $dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date('w', strtoti
 </div>
 
 <style>
-/* 日表示用スタイル */
-.schedule-timeline {
-    display: flex;
-    flex-direction: column;
-}
+    /* 日表示用スタイル */
+    .schedule-timeline {
+        display: flex;
+        flex-direction: column;
+    }
 
-.schedule-hour {
-    display: flex;
-    min-height: 60px;
-    border-bottom: 1px solid #dee2e6;
-}
+    .schedule-hour {
+        display: flex;
+        min-height: 60px;
+        border-bottom: 1px solid #dee2e6;
+    }
 
-.schedule-time {
-    width: 80px;
-    padding: 8px;
-    font-weight: bold;
-    color: #6c757d;
-    text-align: right;
-    border-right: 1px solid #dee2e6;
-}
+    .schedule-time {
+        width: 80px;
+        padding: 8px;
+        font-weight: bold;
+        color: #6c757d;
+        text-align: right;
+        border-right: 1px solid #dee2e6;
+    }
 
-.schedule-items {
-    flex: 1;
-    padding: 5px;
-    min-height: 60px;
-}
+    .schedule-items {
+        flex: 1;
+        padding: 5px;
+        min-height: 60px;
+    }
 
-.schedule-item {
-    margin-bottom: 5px;
-    padding: 5px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-}
+    .schedule-item {
+        margin-bottom: 5px;
+        padding: 5px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
 
-.schedule-item a {
-    text-decoration: none;
-    color: inherit;
-    display: block;
-}
+    .schedule-item a {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
 
-.schedule-item .schedule-title {
-    font-weight: bold;
-}
+    .schedule-item .schedule-title {
+        font-weight: bold;
+    }
 
-.empty-slot {
-    width: 100%;
-    height: 100%;
-    min-height: 50px;
-    cursor: pointer;
-}
+    .empty-slot {
+        width: 100%;
+        height: 100%;
+        min-height: 50px;
+        cursor: pointer;
+    }
 
-.empty-slot:hover {
-    background-color: #f8f9fa;
-}
+    .empty-slot:hover {
+        background-color: #f8f9fa;
+    }
 
-.priority-high {
-    background-color: #f8d7da;
-    border-left: 3px solid #dc3545;
-}
+    .priority-high {
+        background-color: #f8d7da;
+        border-left: 3px solid #dc3545;
+    }
 
-.priority-normal {
-    background-color: #d1e7dd;
-    border-left: 3px solid #198754;
-}
+    .priority-normal {
+        background-color: #d1e7dd;
+        border-left: 3px solid #198754;
+    }
 
-.priority-low {
-    background-color: #cfe2ff;
-    border-left: 3px solid #0d6efd;
-}
+    .priority-low {
+        background-color: #cfe2ff;
+        border-left: 3px solid #0d6efd;
+    }
 </style>

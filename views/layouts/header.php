@@ -39,6 +39,7 @@ $currentUser = \Core\Auth::getInstance()->user();
     <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet">
+
     <!-- Flatpickr CSS -->
     <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css" rel="stylesheet">
@@ -47,6 +48,30 @@ $currentUser = \Core\Auth::getInstance()->user();
 
     <!-- カスタムCSS -->
     <link href="<?php echo BASE_PATH; ?>/css/style.css" rel="stylesheet">
+    <!-- views/layouts/header.php の最後に追加 -->
+    <style>
+        /* モーダル内のselect2対応 */
+        .select2-container {
+            z-index: 10000;
+        }
+
+        .select2-dropdown {
+            z-index: 10001;
+        }
+
+        /* フラットピッカー対応 */
+        .flatpickr-calendar {
+            z-index: 10002 !important;
+        }
+
+        /* 選択不可の状態を解除 */
+        #schedule-modal input:not([disabled]),
+        #schedule-modal select:not([disabled]),
+        #schedule-modal textarea:not([disabled]) {
+            background-color: #fff;
+            opacity: 1;
+        }
+    </style>
 </head>
 
 <body>
