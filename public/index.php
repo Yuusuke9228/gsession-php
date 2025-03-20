@@ -343,5 +343,290 @@ $router->apiGet('/active-users', function () {
     return $controller->apiGetActiveUsers();
 }, true);
 
+// ワークフロー関連のルーティング
+// ワークフロー管理画面
+$router->get('/workflow', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->index();
+}, true);
+
+// テンプレート一覧
+$router->get('/workflow/templates', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->templates();
+}, true);
+
+// テンプレート作成画面
+$router->get('/workflow/create-template', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->createTemplate();
+}, true);
+
+// テンプレート編集画面
+$router->get('/workflow/edit-template/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->editTemplate($params);
+}, true);
+
+// フォームデザイナー画面
+$router->get('/workflow/design-form/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->designForm($params);
+}, true);
+
+// 承認経路設定画面
+$router->get('/workflow/design-route/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->designRoute($params);
+}, true);
+
+// 申請一覧画面
+$router->get('/workflow/requests', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->requests();
+}, true);
+
+// 承認待ち一覧画面
+$router->get('/workflow/approvals', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->approvals();
+}, true);
+
+// 新規申請作成画面
+$router->get('/workflow/create/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->create($params);
+}, true);
+
+// 申請編集画面
+$router->get('/workflow/edit/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->edit($params);
+}, true);
+
+// 申請詳細画面
+$router->get('/workflow/view/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->viewDetails($params);
+}, true);
+
+// 代理承認設定画面
+$router->get('/workflow/delegates', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->delegates();
+}, true);
+
+// ワークフロー関連のルーティング
+// ワークフロー一覧
+$router->get('/workflow', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->index();
+}, true);
+
+// テンプレート一覧
+$router->get('/workflow/templates', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->templates();
+}, true);
+
+// テンプレート作成
+$router->get('/workflow/create-template', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->createTemplate();
+}, true);
+
+// テンプレート編集
+$router->get('/workflow/edit-template/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->editTemplate($params);
+}, true);
+
+// フォームデザイナー
+$router->get('/workflow/design-form/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->designForm($params);
+}, true);
+
+// 承認経路デザイナー
+$router->get('/workflow/design-route/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->designRoute($params);
+}, true);
+
+// 申請一覧
+$router->get('/workflow/requests', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->requests();
+}, true);
+
+// 承認待ち一覧
+$router->get('/workflow/approvals', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->approvals();
+}, true);
+
+// 新規申請作成
+$router->get('/workflow/create/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->create($params);
+}, true);
+
+// 申請編集
+$router->get('/workflow/edit/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->edit($params);
+}, true);
+
+// 申請詳細
+$router->get('/workflow/view/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    $controller->viewDetails($params);
+}, true);
+
+// 代理承認設定
+$router->get('/workflow/delegates', function () {
+    $controller = new Controllers\WorkflowController();
+    $controller->delegates();
+}, true);
+
+// API ルート
+// テンプレート関連API
+$router->apiGet('/workflow/templates', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiGetAllTemplates($params);
+}, true);
+
+$router->apiGet('/workflow/templates/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiGetTemplate($params);
+}, true);
+
+$router->apiPost('/workflow/templates', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiCreateTemplate($params, $data);
+}, true);
+
+$router->apiPost('/workflow/templates/:id', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiUpdateTemplate($params, $data);
+}, true);
+
+$router->apiDelete('/workflow/templates/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiDeleteTemplate($params);
+}, true);
+
+// フォーム関連API
+$router->apiGet('/workflow/templates/:id/form', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiGetTemplate($params);
+}, true);
+
+$router->apiPost('/workflow/templates/:id/form', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiSaveFormDefinitions($params, $data);
+}, true);
+
+$router->apiPost('/workflow/templates/:id/form-fields', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiAddFormField($params, $data);
+}, true);
+
+$router->apiPost('/workflow/templates/:id/form-fields/:field_id', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiUpdateFormField($params, $data);
+}, true);
+
+$router->apiDelete('/workflow/templates/:id/form-fields/:field_id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiDeleteFormField($params);
+}, true);
+
+// 承認経路関連API
+$router->apiGet('/workflow/templates/:id/route', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiGetTemplate($params);
+}, true);
+
+$router->apiPost('/workflow/templates/:id/route', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiSaveRouteDefinitions($params, $data);
+}, true);
+
+$router->apiPost('/workflow/templates/:id/route-steps', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiAddRouteStep($params, $data);
+}, true);
+
+$router->apiPost('/workflow/templates/:id/route-steps/:step_id', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiUpdateRouteStep($params, $data);
+}, true);
+
+$router->apiDelete('/workflow/templates/:id/route-steps/:step_id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiDeleteRouteStep($params);
+}, true);
+
+// 申請関連API
+$router->apiGet('/workflow/requests', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiGetRequests($params);
+}, true);
+
+$router->apiGet('/workflow/requests/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiGetRequest($params);
+}, true);
+
+$router->apiPost('/workflow/requests', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiCreateRequest($params, $data);
+}, true);
+
+$router->apiPost('/workflow/requests/:id', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiUpdateRequest($params, $data);
+}, true);
+
+$router->apiDelete('/workflow/requests/:id', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiCancelRequest($params);
+}, true);
+
+// 承認関連API
+$router->apiPost('/workflow/requests/:id/approve', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiProcessApproval($params, $data);
+}, true);
+
+$router->apiPost('/workflow/requests/:id/comments', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiAddComment($params, $data);
+}, true);
+
+// 代理承認設定API
+$router->apiPost('/workflow/delegates', function ($params, $data) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiAddDelegation($params, $data);
+}, true);
+
+// エクスポートAPI
+$router->apiGet('/workflow/requests/:id/export/pdf', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiExportPdf($params);
+}, true);
+
+$router->apiGet('/workflow/requests/:id/export/csv', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiExportCsv($params);
+}, true);
+
+// 統計情報API
+$router->apiGet('/workflow/stats', function ($params) {
+    $controller = new Controllers\WorkflowController();
+    return $controller->apiGetStats($params);
+}, true);
+
 // リクエストのディスパッチ（ルーティング処理の実行）
 $router->dispatch();

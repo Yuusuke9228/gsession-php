@@ -13,6 +13,8 @@ if (strpos($requestUri, '/organizations') !== false) {
     $currentPage = 'users';
 } elseif (strpos($requestUri, '/schedule') !== false) {
     $currentPage = 'schedule';
+} elseif (strpos($requestUri, '/workflow') !== false) {
+    $currentPage = 'workflow';
 }
 
 // 現在のユーザー情報
@@ -90,6 +92,21 @@ $currentUser = \Core\Auth::getInstance()->user();
                                 <i class="far fa-calendar-alt"></i> スケジュール
                             </a>
                         </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle <?php echo strpos($requestUri, '/workflow') !== false ? 'active' : ''; ?>" href="#" id="workflowDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-tasks"></i> ワークフロー
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="workflowDropdown">
+                                <li><a class="dropdown-item" href="<?php echo BASE_PATH; ?>/workflow">ダッシュボード</a></li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_PATH; ?>/workflow/requests">申請一覧</a></li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_PATH; ?>/workflow/approvals">承認待ち一覧</a></li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_PATH; ?>/workflow/templates">テンプレート管理</a></li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_PATH; ?>/workflow/delegates">代理承認設定</a></li>
+                            </ul>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link <?php echo $currentPage === 'organizations' ? 'active' : ''; ?>" href="<?php echo BASE_PATH; ?>/organizations">
                                 <i class="far fa-building"></i> 組織管理
@@ -109,6 +126,7 @@ $currentUser = \Core\Auth::getInstance()->user();
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                                 <li><a class="dropdown-item" href="<?php echo BASE_PATH; ?>/users/view/<?php echo $currentUser['id']; ?>">プロフィール</a></li>
                                 <li><a class="dropdown-item" href="<?php echo BASE_PATH; ?>/users/change-password/<?php echo $currentUser['id']; ?>">パスワード変更</a></li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_PATH; ?>/workflow/approvals">承認待ち一覧</a></li>
                                 <li>
                                     <hr class="dropdown-divider">
                                 </li>

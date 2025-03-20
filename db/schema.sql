@@ -100,12 +100,148 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ワークフローテンプレートテーブル
+CREATE TABLE IF NOT EXISTS workflow_templates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL COMMENT 'テンプレート名',
+    description TEXT COMMENT '説明',
+    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active' COMMENT 'ステータス',
+    creator_id INT NOT NULL COMMENT '作成者ID',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '作成日時',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新日時',
+    FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ワークフローテンプレート';
+
+-- フォーム定義テーブル
+CREATE TABLE IF NOT EXISTS workflow_form_definitions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    template_id INT NOT NULL COMMENT 'テンプレートID',
+    field_id VARCHAR(50) NOT NULL COMMENT 'フィールドID',
+    field_type ENUM('text', 'textarea', 'select', 'radio', 'checkbox', 'date', 'number', 'file', 'heading', 'hidden') NOT NULL COMMENT 'フィールドタイプ',
+    label VARCHAR(100) NOT NULL COMMENT 'ラベル',
+    placeholder VARCHAR(100) COMMENT 'プレースホルダー',
+    help_text TEXT COMMENT 'ヘルプテキスト',
+    options TEXT COMMENT '選択肢（JSON形式）',
+    validation TEXT COMMENT 'バリデーションルール（JSON形式）',
+    is_required BOOLEAN NOT NULL DEFAULT FALSE COMMENT '必須項目か',
+    sort_order INT NOT NULL DEFAULT 0 COMMENT '表示順',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '作成日時',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新日時',
+    FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE,
+    UNIQUE KEY (template_id, field_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ワークフローフォーム定義';
+
+-- 承認経路定義テーブル
+CREATE TABLE IF NOT EXISTS workflow_route_definitions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    template_id INT NOT NULL COMMENT 'テンプレートID',
+    step_number INT NOT NULL COMMENT 'ステップ番号',
+    step_type ENUM('approval', 'notification') NOT NULL DEFAULT 'approval' COMMENT 'ステップタイプ（承認/通知）',
+    step_name VARCHAR(100) NOT NULL COMMENT 'ステップ名',
+    approver_type ENUM('user', 'role', 'organization', 'dynamic') NOT NULL COMMENT '承認者タイプ',
+    approver_id INT COMMENT '承認者ID（user, role, organizationの場合）',
+    dynamic_approver_field_id VARCHAR(50) COMMENT '動的承認者フィールドID（dynamicの場合）',
+    allow_delegation BOOLEAN NOT NULL DEFAULT FALSE COMMENT '代理承認を許可するか',
+    allow_self_approval BOOLEAN NOT NULL DEFAULT FALSE COMMENT '自己承認を許可するか',
+    parallel_approval BOOLEAN NOT NULL DEFAULT FALSE COMMENT '平行承認か',
+    approval_condition TEXT COMMENT '承認条件（JSON形式）',
+    sort_order INT NOT NULL DEFAULT 0 COMMENT '表示順',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '作成日時',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新日時',
+    FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ワークフロー承認経路定義';
+
+-- 申請テーブル
+CREATE TABLE IF NOT EXISTS workflow_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    request_number VARCHAR(50) NOT NULL COMMENT '申請番号',
+    template_id INT NOT NULL COMMENT 'テンプレートID',
+    title VARCHAR(255) NOT NULL COMMENT '申請タイトル',
+    status ENUM('draft', 'pending', 'approved', 'rejected', 'cancelled') NOT NULL DEFAULT 'draft' COMMENT 'ステータス',
+    current_step INT DEFAULT NULL COMMENT '現在のステップ',
+    requester_id INT NOT NULL COMMENT '申請者ID',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '作成日時',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新日時',
+    FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE RESTRICT,
+    FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE RESTRICT,
+    UNIQUE KEY (request_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ワークフロー申請';
+
+-- 申請データテーブル
+CREATE TABLE IF NOT EXISTS workflow_request_data (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    request_id INT NOT NULL COMMENT '申請ID',
+    field_id VARCHAR(50) NOT NULL COMMENT 'フィールドID',
+    value TEXT COMMENT '値',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '作成日時',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新日時',
+    FOREIGN KEY (request_id) REFERENCES workflow_requests(id) ON DELETE CASCADE,
+    UNIQUE KEY (request_id, field_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ワークフロー申請データ';
+
+-- 添付ファイルテーブル
+CREATE TABLE IF NOT EXISTS workflow_attachments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    request_id INT NOT NULL COMMENT '申請ID',
+    field_id VARCHAR(50) NOT NULL COMMENT 'フィールドID',
+    file_name VARCHAR(255) NOT NULL COMMENT 'ファイル名',
+    file_path VARCHAR(255) NOT NULL COMMENT 'ファイルパス',
+    file_size INT NOT NULL COMMENT 'ファイルサイズ',
+    mime_type VARCHAR(100) NOT NULL COMMENT 'MIMEタイプ',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '作成日時',
+    FOREIGN KEY (request_id) REFERENCES workflow_requests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ワークフロー添付ファイル';
+
+-- 承認履歴テーブル
+CREATE TABLE IF NOT EXISTS workflow_approvals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    request_id INT NOT NULL COMMENT '申請ID',
+    step_number INT NOT NULL COMMENT 'ステップ番号',
+    approver_id INT NOT NULL COMMENT '承認者ID',
+    delegate_id INT COMMENT '代理承認者ID',
+    status ENUM('pending', 'approved', 'rejected', 'skipped') NOT NULL DEFAULT 'pending' COMMENT 'ステータス',
+    comment TEXT COMMENT 'コメント',
+    acted_at TIMESTAMP NULL DEFAULT NULL COMMENT '承認/却下日時',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '作成日時',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新日時',
+    FOREIGN KEY (request_id) REFERENCES workflow_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (approver_id) REFERENCES users(id) ON DELETE RESTRICT,
+    FOREIGN KEY (delegate_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ワークフロー承認履歴';
+
+-- コメントテーブル
+CREATE TABLE IF NOT EXISTS workflow_comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    request_id INT NOT NULL COMMENT '申請ID',
+    user_id INT NOT NULL COMMENT 'ユーザーID',
+    comment TEXT NOT NULL COMMENT 'コメント',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '作成日時',
+    FOREIGN KEY (request_id) REFERENCES workflow_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ワークフローコメント';
+
+-- 代理承認設定テーブル
+CREATE TABLE IF NOT EXISTS workflow_delegates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL COMMENT 'ユーザーID',
+    delegate_id INT NOT NULL COMMENT '代理人ID',
+    template_id INT COMMENT 'テンプレートID（NULLの場合はすべてのテンプレート）',
+    start_date DATE NOT NULL COMMENT '開始日',
+    end_date DATE NOT NULL COMMENT '終了日',
+    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active' COMMENT 'ステータス',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '作成日時',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新日時',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (delegate_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ワークフロー代理承認設定';
+
 -- 初期データ挿入
 INSERT INTO organizations (name, code, level, description)
 VALUES ('本社', 'HQ', 1, 'トップレベル組織');
 
 INSERT INTO users (username, password, email, first_name, last_name, display_name, organization_id, role)
-VALUES ('admin', '$2y$10$oCvmLxHGIUzPRZu9VwfSSOL5yJ7K0YA8a3jN3i7e1Y7Wc1Z8e5tUu', 'admin@example.com', '管理者', 'ユーザー', '管理者', 1, 'admin');
+VALUES ('admin', '$2y$10$fIfMRDXytV.YStSWln4raOAWV9xEfOUui9JAj0.2z3ejVahDvjpwq', 'admin@example.com', '管理者', 'ユーザー', '管理者', 1, 'admin');
 
 INSERT INTO user_organizations (user_id, organization_id, is_primary)
 VALUES (1, 1, 1);
