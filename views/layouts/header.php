@@ -2,7 +2,7 @@
 // views/layouts/header.php
 
 // ページタイトルを設定
-$pageTitle = $title ?? 'GroupSession PHP';
+$pageTitle = $title ?? 'GroupWare Sample';
 
 // 現在のページを取得
 $currentPage = '';
@@ -32,6 +32,7 @@ $currentUser = \Core\Auth::getInstance()->user();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
     <!-- Toastr CSS (通知用) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet">
     <!-- DataTables CSS -->
