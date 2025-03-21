@@ -571,8 +571,7 @@ class Workflow
 
             case 'role':
                 // 特定のロール（役割）を持つすべてのユーザー
-                $sql = "SELECT id FROM users WHERE role = 
-                        (SELECT role FROM users WHERE id = ?)";
+                $sql = "SELECT id FROM users WHERE role = ? AND status = 'active'";
                 $users = $this->db->fetchAll($sql, [$step['approver_id']]);
                 foreach ($users as $user) {
                     $approvers[] = $user['id'];
@@ -592,7 +591,7 @@ class Workflow
                 // 動的承認者（申請フォームのフィールドから取得）
                 if ($requestId && $step['dynamic_approver_field_id']) {
                     $sql = "SELECT value FROM workflow_request_data 
-                            WHERE request_id = ? AND field_id = ? LIMIT 1";
+                        WHERE request_id = ? AND field_id = ? LIMIT 1";
                     $result = $this->db->fetch($sql, [$requestId, $step['dynamic_approver_field_id']]);
 
                     if ($result && !empty($result['value'])) {
@@ -609,7 +608,10 @@ class Workflow
             });
         }
 
-        return array_unique($approvers);
+        // デバッグ用
+        error_log("determineApprovers for step {$step['step_number']}: " . json_encode($approvers));
+
+        return array_values(array_unique($approvers));
     }
 
     /**
@@ -768,9 +770,6 @@ class Workflow
         return $this->db->fetchAll($sql, [$requestId]);
     }
 
-    /**
-     * 申請を承認/却下する
-     */
     public function processApproval($requestId, $approverId, $data)
     {
         // トランザクション開始
@@ -785,7 +784,7 @@ class Workflow
 
             // 現在のステップの承認情報を取得
             $sql = "SELECT * FROM workflow_approvals 
-                    WHERE request_id = ? AND step_number = ? AND approver_id = ? AND status = 'pending' LIMIT 1";
+                WHERE request_id = ? AND step_number = ? AND approver_id = ? AND status = 'pending' LIMIT 1";
             $approval = $this->db->fetch($sql, [$requestId, $request['current_step'], $approverId]);
 
             if (!$approval) {
@@ -807,11 +806,11 @@ class Workflow
 
             // 承認/却下を記録
             $sql = "UPDATE workflow_approvals SET 
-                    status = ?, 
-                    delegate_id = ?, 
-                    comment = ?, 
-                    acted_at = NOW() 
-                    WHERE id = ?";
+                status = ?, 
+                delegate_id = ?, 
+                comment = ?, 
+                acted_at = NOW() 
+                WHERE id = ?";
 
             $this->db->execute($sql, [
                 $data['action'],
@@ -831,22 +830,33 @@ class Workflow
                 return true;
             }
 
-            // 現在のステップの全ての承認者が承認したか確認
+            // 現在のステップの他の未承認タスクをチェック
             $sql = "SELECT COUNT(*) as count FROM workflow_approvals 
-                    WHERE request_id = ? AND step_number = ? AND status = 'pending'";
-            $pendingCount = $this->db->fetch($sql, [$requestId, $request['current_step']]);
+                WHERE request_id = ? AND step_number = ? AND status = 'pending'";
+            $pendingResult = $this->db->fetch($sql, [$requestId, $request['current_step']]);
+            $pendingCount = $pendingResult ? (int)$pendingResult['count'] : 0;
+
+            // デバッグ用
+            error_log("pendingCount: " . $pendingCount);
 
             // 保留中の承認がなければ次のステップへ
-            if ($pendingCount['count'] == 0) {
+            if ($pendingCount === 0) {
                 // 次のステップを取得
                 $sql = "SELECT * FROM workflow_route_definitions 
-                        WHERE template_id = ? AND step_number > ? 
-                        ORDER BY step_number, sort_order 
-                        LIMIT 1";
+                    WHERE template_id = ? AND step_number > ? 
+                    ORDER BY step_number, sort_order 
+                    LIMIT 1";
                 $nextStep = $this->db->fetch($sql, [
                     $request['template_id'],
                     $request['current_step']
                 ]);
+
+                // デバッグ用
+                if ($nextStep) {
+                    error_log("Next step found: " . json_encode($nextStep));
+                } else {
+                    error_log("No next step found");
+                }
 
                 if ($nextStep) {
                     // 次のステップがある場合
@@ -858,22 +868,34 @@ class Workflow
                     // 次のステップの承認者を設定
                     $approvers = $this->determineApprovers($nextStep, $request['requester_id'], $requestId);
 
-                    foreach ($approvers as $nextApproverId) {
-                        $sql = "INSERT INTO workflow_approvals (
+                    // デバッグ用
+                    error_log("Approvers for next step: " . json_encode($approvers));
+
+                    if (!empty($approvers)) {
+                        foreach ($approvers as $nextApproverId) {
+                            $sql = "INSERT INTO workflow_approvals (
                                     request_id, 
                                     step_number, 
                                     approver_id, 
                                     status
                                 ) VALUES (?, ?, ?, 'pending')";
 
-                        $this->db->execute($sql, [
-                            $requestId,
-                            $nextStep['step_number'],
-                            $nextApproverId
-                        ]);
+                            $this->db->execute($sql, [
+                                $requestId,
+                                $nextStep['step_number'],
+                                $nextApproverId
+                            ]);
+                        }
+                    } else {
+                        // 承認者が見つからない場合は次のステップをスキップ
+                        error_log("No approvers found for step " . $nextStep['step_number'] . ", skipping to next step");
+
+                        // 再帰的に次のステップを処理
+                        $this->moveToNextStep($requestId, $request['template_id'], $nextStep['step_number'], $request['requester_id']);
                     }
                 } else {
                     // 次のステップがない場合は承認完了
+                    error_log("No more steps, marking request as approved");
                     $this->db->execute(
                         "UPDATE workflow_requests SET status = 'approved' WHERE id = ?",
                         [$requestId]
@@ -885,7 +907,62 @@ class Workflow
             return true;
         } catch (\Exception $e) {
             $this->db->rollBack();
+            error_log("Error in processApproval: " . $e->getMessage());
             throw $e;
+        }
+    }
+    /**
+     * 次のステップに移動（再帰的に処理）
+     */
+    public function moveToNextStep($requestId, $templateId, $currentStep, $requesterId)
+    {
+        // 次のステップを取得
+        $sql = "SELECT * FROM workflow_route_definitions 
+            WHERE template_id = ? AND step_number > ? 
+            ORDER BY step_number, sort_order 
+            LIMIT 1";
+        $nextStep = $this->db->fetch($sql, [
+            $templateId,
+            $currentStep
+        ]);
+
+        if ($nextStep) {
+            // 次のステップの情報をセット
+            $this->db->execute(
+                "UPDATE workflow_requests SET current_step = ? WHERE id = ?",
+                [$nextStep['step_number'], $requestId]
+            );
+
+            // 次のステップの承認者を設定
+            $approvers = $this->determineApprovers($nextStep, $requesterId, $requestId);
+
+            if (!empty($approvers)) {
+                foreach ($approvers as $nextApproverId) {
+                    $sql = "INSERT INTO workflow_approvals (
+                            request_id, 
+                            step_number, 
+                            approver_id, 
+                            status
+                        ) VALUES (?, ?, ?, 'pending')";
+
+                    $this->db->execute($sql, [
+                        $requestId,
+                        $nextStep['step_number'],
+                        $nextApproverId
+                    ]);
+                }
+                return true;
+            } else {
+                // 承認者が見つからない場合は次のステップを再帰的に処理
+                return $this->moveToNextStep($requestId, $templateId, $nextStep['step_number'], $requesterId);
+            }
+        } else {
+            // 次のステップがない場合は承認完了
+            $this->db->execute(
+                "UPDATE workflow_requests SET status = 'approved' WHERE id = ?",
+                [$requestId]
+            );
+            return true;
         }
     }
 

@@ -208,8 +208,7 @@ class WorkflowController extends Controller
 
     /**
      * 申請一覧ページを表示
-     */
-    public function requests()
+     */ public function requests()
     {
         // フィルタリング条件
         $filters = [
@@ -218,15 +217,19 @@ class WorkflowController extends Controller
             'search' => $_GET['search'] ?? null,
         ];
 
+        // 権限に基づいてフィルタリング
+        $userId = $this->auth->id();
+        $isAdmin = $this->auth->isAdmin();
+
+        // 管理者以外は自分の申請のみ表示
+        if (!$isAdmin) {
+            $filters['requester_id'] = $userId;
+        }
+
         // ページネーション
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $page = max(1, $page);
         $limit = 20;
-
-        // 自分が作成した申請のみ表示（管理者以外）
-        if (!$this->auth->isAdmin()) {
-            $filters['requester_id'] = $this->auth->id();
-        }
 
         // 申請リストを取得
         $requests = $this->model->getRequests($filters, $page, $limit);
@@ -244,6 +247,7 @@ class WorkflowController extends Controller
             'totalPages' => $totalPages,
             'filters' => $filters,
             'templates' => $templates,
+            'isAdmin' => $isAdmin,
             'jsFiles' => ['workflow.js']
         ];
 
@@ -255,10 +259,12 @@ class WorkflowController extends Controller
      */
     public function approvals()
     {
+        $userId = $this->auth->id();
+
         // フィルタリング条件
         $filters = [
             'pending_approval' => true,
-            'user_id' => $this->auth->id(),
+            'user_id' => $userId,
             'template_id' => $_GET['template_id'] ?? null,
             'search' => $_GET['search'] ?? null,
         ];
@@ -1386,7 +1392,7 @@ class WorkflowController extends Controller
     /**
      * API: ワークフロー統計情報を取得
      */
-    public function apiGetStats($params)
+    public function apiGetStats()
     {
         // 認証チェック
         if (!$this->auth->check()) {
@@ -1396,34 +1402,28 @@ class WorkflowController extends Controller
         $userId = $this->auth->id();
         $isAdmin = $this->auth->isAdmin();
 
-        // テンプレート数を取得
-        $templatesCount = $this->model->getTemplateCount();
+        // テンプレート数
+        $templateCount = $this->model->getTemplateCount();
 
-        // 申請数を取得
-        $requestsFilters = [];
-        $requestsCount = $this->model->getRequestCount($requestsFilters);
+        // 申請数（管理者は全て、一般ユーザーは自分のみ）
+        $requestFilters = $isAdmin ? [] : ['requester_id' => $userId];
+        $requestCount = $this->model->getRequestCount($requestFilters);
 
-        // 自分の申請数を取得
-        $myRequestsFilters = ['requester_id' => $userId];
-        $myRequestsCount = $this->model->getRequestCount($myRequestsFilters);
-
-        // 承認待ち数を取得
-        $pendingApprovalsFilters = [
+        // 承認待ち数
+        $pendingFilters = [
             'pending_approval' => true,
             'user_id' => $userId
         ];
-        $pendingApprovalsCount = $this->model->getRequestCount($pendingApprovalsFilters);
+        $pendingCount = $this->model->getRequestCount($pendingFilters);
 
-        // ステータス別の申請数を取得
-        $statusStats = [
-            'draft' => 0,
-            'pending' => 0,
-            'approved' => 0,
-            'rejected' => 0,
-            'cancelled' => 0
-        ];
+        // 自分の申請数
+        $myRequestCount = $this->model->getRequestCount(['requester_id' => $userId]);
 
-        foreach ($statusStats as $status => $count) {
+        // ステータス別統計
+        $statusStats = [];
+        $statuses = ['draft', 'pending', 'approved', 'rejected', 'cancelled'];
+
+        foreach ($statuses as $status) {
             $filters = ['status' => $status];
             if (!$isAdmin) {
                 $filters['requester_id'] = $userId;
@@ -1431,25 +1431,23 @@ class WorkflowController extends Controller
             $statusStats[$status] = $this->model->getRequestCount($filters);
         }
 
-        // 最近の申請を取得
-        $recentFilters = [];
-        if (!$isAdmin) {
-            $recentFilters['requester_id'] = $userId;
-        }
+        // 最近の申請
+        $recentFilters = $isAdmin ? [] : ['requester_id' => $userId];
         $recentRequests = $this->model->getRequests($recentFilters, 1, 5);
 
         return [
             'success' => true,
             'data' => [
-                'templates_count' => $templatesCount,
-                'requests_count' => $requestsCount,
-                'my_requests' => $myRequestsCount,
-                'pending_approvals' => $pendingApprovalsCount,
+                'templates_count' => $templateCount,
+                'requests_count' => $requestCount,
+                'pending_approvals' => $pendingCount,
+                'my_requests' => $myRequestCount,
                 'status_stats' => $statusStats,
                 'recent_requests' => $recentRequests
             ]
         ];
     }
+
     /**
      * API: フォーム定義を一括保存
      */
